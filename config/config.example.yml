@@ -1,0 +1,16 @@
+# Merge into ~/.omp/agent/config.yml. Every agent also lists a concrete
+# fallback model, so these roles are optional overrides.
+modelRoles:
+  factory_plan: litellm/claude-opus-5-5:high
+  factory_impl: litellm/claude-opus-5-5
+  factory_test: litellm/claude-opus-5-5
+  factory_review: litellm/openai-gpt-6.1-sol   # different family on purpose; 128K context
+
+task:
+  enableLsp: true            # factory-implementer lists lsp; off by default for subagents
+  isolation:
+    enabled: true            # coordinator sets isolated: true per packet when on
+    merge: branch            # changes land on omp/task/<id> branches
+  agentSoftRequestBudget:
+    factory-implementer: 300
+    factory-tester: 250

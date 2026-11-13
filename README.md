@@ -1,0 +1,69 @@
+# omp-factory
+
+A software factory for [oh-my-pi](https://github.com/can1357/oh-my-pi): a main-session coordinator takes a high-level task through brief → plan → design → implement → test → review → integrate, with specialist subagents exchanging schema-validated handoffs and key decisions escalated to you.
+
+```mermaid
+flowchart TD
+  U[Task] --> B[Brief] --> G1{Gate 1: approve brief}
+  G1 --> P[factory-planner: WorkPlan]
+  P --> D[factory-designer: DesignNote per risky packet]
+  D --> G2{Gate 2: blocking decisions}
+  G2 --> I[factory-implementer per packet, in waves]
+  I --> T[factory-tester: TestReport]
+  T -->|fail, max 2 loops| I
+  T --> R[factory-reviewer, different model: ReviewReport]
+  R -->|changes, max 2 loops| I
+  R --> G3{Gate 3: commit / push / PR}
+```
+
+## Why the coordinator is a skill
+
+Subagents run headless and cannot ask you anything. Only the main session can raise a question, so the coordinator lives there as the `factory` skill. Workers report `decisions[]`, and the coordinator batches them into one form per gate.
+
+## Layout
+
+| Path | Purpose |
+|---|---|
+| `agents/factory-*.md` | Five specialist agents. Each has an `output:` JSON Schema, which is the handoff contract. |
+| `skills/factory/SKILL.md` | Coordinator playbook: triage, gates, waves, fix loops, integration |
+| `skills/factory/templates/` | Brief, decision ledger, run state, per-repo `RULES.md` |
+| `hooks/pre/factory-guard.ts` | Blocks subagents from commit/push/merge/branch rewrites; only the coordinator integrates |
+| `config/config.example.yml` | Optional model roles and isolation settings |
+
+## Install
+
+```bash
+./install.sh
+```
+
+The script symlinks the agents, the skill and the hook into `~/.omp/agent/`, which makes them available in every repo. Edits in this repo take effect in new sessions. It is safe to re-run, and it never overwrites a real file.
+
+Optionally, merge `config/config.example.yml` into `~/.omp/agent/config.yml`.
+
+## Per-repo setup
+
+Subagents receive `.omp/RULES.md` but not `AGENTS.md`. Each repo therefore needs a short `.omp/RULES.md` that lists its build, test and lint commands (see `skills/factory/templates/RULES.md`). If the file is missing, the coordinator drafts one and shows it to you at Gate 1.
+
+To specialize a role for one repo, add `.omp/agents/factory-tester.md` (or another role) to that repo. Project agents override user agents of the same name.
+
+## Use
+
+```
+/skill:factory Add rate limiting to the public API
+```
+
+Each run's artifacts go in `.factory/runs/<slug>/` inside the target repo. The coordinator adds `.factory/` to `.git/info/exclude`, so the run directory stays untracked without editing `.gitignore`. Watch and steer workers live from Agent Hub (`Alt+A`).
+
+## Gates
+
+| Gate | When | You decide |
+|---|---|---|
+| 1 | Always, before planning | Brief and acceptance criteria |
+| 2 | Only when a decision is blocking | Open design choices. Non-blocking decisions use the recommended option and are listed in the ledger, where you can override them. |
+| 3 | Always, before anything is committed | Commit, push, open a PR, or leave the changes uncommitted |
+
+## Tests
+
+```bash
+bun test
+```
