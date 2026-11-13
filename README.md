@@ -30,6 +30,13 @@ Subagents run headless and cannot ask you anything. Only the main session can ra
 | `hooks/pre/factory-guard.ts` | Blocks subagents from commit/push/merge/branch rewrites; only the coordinator integrates |
 | `config/config.example.yml` | Optional model roles and isolation settings |
 
+## Prerequisites
+
+- [oh-my-pi](https://github.com/can1357/oh-my-pi) (`omp`) installed and configured with at least one model provider.
+- `git`. The coordinator creates a `factory/<slug>` branch in the target repo and refuses to start on a dirty working tree.
+- Access to the models the agents use. Each agent tries a `@factory_*` role first, then falls back to a concrete model: `litellm/claude-opus-5-5`, and `litellm/openai-gpt-6.1-sol` for the reviewer. If your provider names differ, set the roles in `~/.omp/agent/config.yml` (see `config/config.example.yml`).
+- [Bun](https://bun.sh), only for running this repo's tests.
+
 ## Install
 
 ```bash
@@ -62,7 +69,17 @@ Each run's artifacts go in `.factory/runs/<slug>/` inside the target repo. The c
 | 2 | Only when a decision is blocking | Open design choices. Non-blocking decisions use the recommended option and are listed in the ledger, where you can override them. |
 | 3 | Always, before anything is committed | Commit, push, open a PR, or leave the changes uncommitted |
 
+## Guard hook limits
+
+`factory-guard.ts` is an approval guard, not a sandbox. It applies only to subagents; the main session (the coordinator) is unaffected.
+
+- It inspects `bash` tool calls only. Commands run through `eval` (for example a Python `subprocess` call) are not seen.
+- It matches command text with regular expressions and does not parse shell syntax. Aliases, variables, wrapper scripts and unusual flag orders can slip past it.
+- It does not restrict which files a subagent edits. The coordinator enforces packet file ownership by checking `git status` after each wave.
+
 ## Tests
+
+Requires Bun:
 
 ```bash
 bun test
