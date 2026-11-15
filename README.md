@@ -24,17 +24,18 @@ Subagents run headless and cannot ask you anything. Only the main session can ra
 
 | Path | Purpose |
 |---|---|
-| `agents/factory-*.md` | Five specialist agents. Each has an `output:` JSON Schema, which is the handoff contract. |
-| `skills/factory/SKILL.md` | Coordinator playbook: triage, gates, waves, fix loops, integration |
+| `agents/factory-*.md` | Five specialist agents. Each has an `output:` JSON Schema, which is the handoff contract, and a `Verification criteria` section it self-checks before `yield`. |
+| `skills/factory/SKILL.md` | Coordinator playbook: triage, gates, waves, fix loops, integration, with a verification check after each phase |
 | `skills/factory/templates/` | Brief, decision ledger, run state, per-repo `RULES.md` |
 | `hooks/pre/factory-guard.ts` | Blocks subagents from commit/push/merge/branch rewrites; only the coordinator integrates |
 | `config/config.example.yml` | Optional model roles and isolation settings |
+| `.omp/RULES.md` | Repo rules read by every agent, including subagents; Test: `bun test` |
 
 ## Prerequisites
 
 - [oh-my-pi](https://github.com/can1357/oh-my-pi) (`omp`) installed and configured with at least one model provider.
 - `git`. The coordinator creates a `factory/<slug>` branch in the target repo and refuses to start on a dirty working tree.
-- Access to the models the agents use. Each agent tries a `@factory_*` role first, then falls back to a concrete model: `litellm/claude-opus-5-5`, and `litellm/openai-gpt-6.1-sol` for the reviewer. If your provider names differ, set the roles in `~/.omp/agent/config.yml` (see `config/config.example.yml`).
+- Models resolve from your OMP model roles: planner, designer, implementer and tester fall back to `@default`; the reviewer to `@advisor` (a different family on purpose). Optional `@factory_plan/impl/test/review` roles override a phase without code changes (see `config/config.example.yml`).
 - [Bun](https://bun.sh), only for running this repo's tests.
 
 ## Install
@@ -49,7 +50,7 @@ Optionally, merge `config/config.example.yml` into `~/.omp/agent/config.yml`.
 
 ## Per-repo setup
 
-Subagents receive `.omp/RULES.md` but not `AGENTS.md`. Each repo therefore needs a short `.omp/RULES.md` that lists its build, test and lint commands (see `skills/factory/templates/RULES.md`). If the file is missing, the coordinator drafts one and shows it to you at Gate 1.
+Subagents receive `.omp/RULES.md` but not `AGENTS.md`. Each repo therefore needs a short `.omp/RULES.md` that lists its build, test and lint commands (see `skills/factory/templates/RULES.md`). If the file is missing, the coordinator drafts one and shows it to you at Gate 1. This repo dogfoods its own `.omp/RULES.md` at the root.
 
 To specialize a role for one repo, add `.omp/agents/factory-tester.md` (or another role) to that repo. Project agents override user agents of the same name.
 
