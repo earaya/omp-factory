@@ -46,6 +46,10 @@ Fix violations by re-spawning the planner with the specific defect, at most twic
 
 For each packet with `needs_design` (or `risk: high` on large tasks), spawn `factory-designer` — all of them in one `tasks[]` batch. Save each to `designs/<packet>.json`. Apply `packet_amendments` only if they keep ownership exclusive; otherwise turn them into decisions.
 
+Verify before continuing:
+- every packet with `needs_design` (or `risk: high` on large tasks) has a saved `designs/<packet>.json` whose approach is concrete;
+- `packet_amendments` that would break ownership exclusivity were routed to decisions, not applied.
+
 ## 5. Decisions → Gate 2
 
 Collect `decisions[]` from planner and designers into `decisions.md` (format: `templates/decisions.md`).
@@ -64,7 +68,11 @@ Write answers back into the ledger with who decided. Never re-ask a decided ques
 3. Each task item contains: the packet JSON, its DesignNote (if any), the ledger decisions that affect it, and the Brief path. Packets must be self-contained; workers start blank.
 4. Save each ChangeReport to `reports/<packet>.change.json`.
 5. `blocked` → turn its decision into a Gate-2-style `ask`, then re-spawn that packet. `partial` → re-spawn once with the gap named; then escalate.
-6. After each wave, check `git status --porcelain` against the wave's `owns`. Files touched outside ownership are a defect: re-assign or revert them only with the user's approval.
+6. Before each wave, snapshot the dirty set to `reports/status-wave-<N>.before`: run `git status --porcelain=v1 -z --untracked-files=all` (NUL-delimited, so untracked files are individual paths and spaces survive), and for each path record `git hash-object` of its content — or a `deleted` marker when the status is a deletion. After the wave, re-run the same commands: every path added, hash changed, or marker changed versus the snapshot must fall inside the wave's `owns` (the cumulative status still lists earlier waves' files). Files touched outside ownership are a defect: re-assign or revert them only with the user's approval.
+
+Verify before continuing:
+- each packet has `reports/<packet>.change.json` with `status: done` (or an escalation under the partial/blocked rules), `files_changed` matching its `owns`, and a `met`/`evidence` entry for every acceptance item;
+- after each wave, the re-run of `git status --porcelain=v1 -z --untracked-files=all` + per-path `git hash-object` (or `deleted` marker) shows every added/changed path inside the wave's `owns` — the raw cumulative status cannot be the check.
 
 ## 7. Test
 
@@ -72,16 +80,29 @@ Spawn one `factory-tester` with the Brief, packets, and ChangeReports. Save `rep
 
 On `fail`: route each failure to its packet's implementer (send findings via a fresh spawn with the prior ChangeReport attached). Re-test. **At most 2 fix loops**, then escalate to the user with the failures.
 
+Verify before continuing:
+- `reports/test.json` shows `verdict: pass`, every acceptance entry cites evidence, and every `commands[]` entry has a real result;
+- on `fail`, the fix loop above applies.
+
 ## 8. Review
 
-Spawn `factory-reviewer` with the Brief, WorkPlan, reports, and the diff instruction `git diff <base>...factory/<slug>`. Save `reports/review.json`.
+Spawn `factory-reviewer` with the Brief, WorkPlan, reports, and the diff instruction: `git diff <base>` (the working tree against the base commit — nothing is committed until Gate 3) plus `git ls-files --others --exclude-standard` and `git diff --no-index /dev/null -- <file>` per untracked path (files the run creates stay untracked until Gate 3). Save `reports/review.json`.
 
 On `changes_requested`: route blocker/major findings to implementers, re-test, re-review. **At most 2 loops**, then escalate. Never dismiss a blocker on your own; disagreeing with the reviewer is a user decision.
+
+Verify before continuing:
+- `reports/review.json` shows `verdict: approve` with `scope_ok: true`;
+- every `findings[]` entry has a `location` (`path:line`);
+- on `changes_requested`, the loop above applies.
 
 ## 9. Integrate → Gate 3 (always)
 
 1. Write `summary.md`: what changed, acceptance status, test and review results, every decision and who made it, and remaining risks.
-2. **Gate 3** `ask`: show the summary and `git diff --stat <base>...HEAD`. Choices:
+
+Verify before Gate 3:
+- `summary.md` states acceptance status, test and review results, and every decision with who made it.
+
+2. **Gate 3** `ask`: show the summary, `git diff --stat <base>`, and the untracked-file list (`git ls-files --others --exclude-standard`). Choices:
    - commit on `factory/<slug>` (preselected);
    - commit and push the branch;
    - commit, push, and open a PR;
