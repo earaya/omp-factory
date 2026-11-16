@@ -179,6 +179,16 @@ describe("factory-state.sh loops", () => {
 		expect(sh(root, "loops", run, "test")).toBe("test fix loops: 0 completed, no pending attempt — autonomous (loops 1-3)");
 	});
 
+	test("invocation from a separate target repo via the canonical installed path", () => {
+		// install.sh:26-30 symlinks the skill tree into
+		// ${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/skills/factory — SKILL.md
+		// references that path, so a target repo must resolve it there.
+		const installed = join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.HOME ?? "", ".omp", "agent"), "skills", "factory", "scripts", "factory-state.sh");
+		const { root, run } = initRepo({ "a.txt": "a\n" });
+		const out = execFileSync("bash", [installed, "loops", run, "test"], { cwd: join(root, "repo"), env: fixtureEnv(root), encoding: "utf8" }).trim();
+		expect(out).toBe("test fix loops: 0 completed, no pending attempt — autonomous (loops 1-3)");
+	});
+
 	test("single fail: fix loop 1 pending, autonomous", () => {
 		const { root, run } = initRepo();
 		report(run, "test.1.json", "fail");
