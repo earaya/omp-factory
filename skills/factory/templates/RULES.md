@@ -16,3 +16,9 @@
 ## Conventions
 
 - <one-line rules that every change must follow>
+
+## Recipes (optional)
+
+Known-good one-liners for recurring verification; add a recipe only after a run has executed it successfully — never spec an untested command.
+
+- <task>: `<cmd>`
