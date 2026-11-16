@@ -1,9 +1,9 @@
 import { describe, expect, test, afterEach } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 // Covers scripts/factory-state.sh — the coordinator state helper. Disk-derivable
 // facts only (freeze/verify/next); the recipe it runs is the §6 step-7 one that
@@ -179,13 +179,20 @@ describe("factory-state.sh loops", () => {
 		expect(sh(root, "loops", run, "test")).toBe("test fix loops: 0 completed, no pending attempt — autonomous (loops 1-3)");
 	});
 
-	test("invocation from a separate target repo via the canonical installed path", () => {
+	test("invocation via the canonical installed path (hermetic temp agent dir)", () => {
 		// install.sh:26-30 symlinks the skill tree into
 		// ${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/skills/factory — SKILL.md
-		// references that path, so a target repo must resolve it there.
-		const installed = join(process.env.PI_CODING_AGENT_DIR ?? join(process.env.HOME ?? "", ".omp", "agent"), "skills", "factory", "scripts", "factory-state.sh");
+		// references that path, so a target repo must resolve it there. Build
+		// that layout in a temp agent dir instead of relying on a prior
+		// install.sh run: a fresh clone must not depend on user-global state.
+		const agentDir = join(mkdtempSync(join(tmpdir(), "factory-agent-")), "agent");
+		dirs.push(dirname(agentDir));
+		mkdirSync(join(agentDir, "skills", "factory", "scripts"), { recursive: true });
+		symlinkSync(SCRIPT, join(agentDir, "skills", "factory", "scripts", "factory-state.sh"));
 		const { root, run } = initRepo({ "a.txt": "a\n" });
-		const out = execFileSync("bash", [installed, "loops", run, "test"], { cwd: join(root, "repo"), env: fixtureEnv(root), encoding: "utf8" }).trim();
+		const env = { ...fixtureEnv(root), PI_CODING_AGENT_DIR: agentDir };
+		const installed = join(agentDir, "skills", "factory", "scripts", "factory-state.sh");
+		const out = execFileSync("bash", [installed, "loops", run, "test"], { cwd: join(root, "repo"), env, encoding: "utf8" }).trim();
 		expect(out).toBe("test fix loops: 0 completed, no pending attempt — autonomous (loops 1-3)");
 	});
 
