@@ -92,17 +92,33 @@ cmd_loops() {
 		echo "$phase fix loops: 0 completed, no pending attempt — autonomous (loops 1-3)"
 		return
 	fi
-	local n=0 latest="" f
-	for f in "$reports/$phase."*.json; do
+	# Generations order numerically: the glob is lexical, so test.10.json
+	# sorts before test.9.json — "latest" must track the highest
+	# generation, not the last glob hit. Sidecars (.notes.md) are not
+	# .json and never match.
+	local n=0 latest="" gen v f line
+	for line in $(for f in "$reports/$phase."*.json; do
 		if [[ ! -e $f ]]; then
 			continue
 		fi
-		if grep -qE '"verdict"[[:space:]]*:[[:space:]]*"'"$bad"'"' "$f"; then
-			n=$(( n + 1 ))
-			latest='bad'
-		else
-			latest='good'
+		gen=${f#"$reports/$phase".}
+		gen=${gen%%.*}
+		if ! [[ $gen =~ ^[0-9]+$ ]]; then
+			continue
 		fi
+		if grep -qE '"verdict"[[:space:]]*:[[:space:]]*"'"$bad"'"' "$f"; then
+			v=bad
+		else
+			v=good
+		fi
+		printf '%s %s\n' "$gen" "$v"
+	done | sort -n); do
+		gen=${line%% *}
+		v=${line#* }
+		if [[ $v == bad ]]; then
+			n=$(( n + 1 ))
+		fi
+		latest=$v
 	done
 	if [[ -z $latest ]]; then
 		echo "$phase fix loops: 0 completed, no pending attempt — autonomous (loops 1-3)"

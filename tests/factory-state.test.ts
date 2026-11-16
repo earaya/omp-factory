@@ -222,6 +222,14 @@ describe("factory-state.sh loops", () => {
 		expect(sh(root, "loops", run, "test")).toBe(loops("test", 2, 3, "autonomous (loops 1-3)"));
 	});
 
+	test("generations order numerically: test.10 is the latest despite lexical glob order; sidecars ignored", () => {
+		const { root, run } = initRepo();
+		report(run, "test.9.json", "pass");  // lexically last, numerically older
+		report(run, "test.10.json", "fail"); // lexically earlier, numerically latest
+		writeFileSync(join(run, "reports", "test.10.notes.md"), "sidecar"); // not .json — never counted
+		expect(sh(root, "loops", run, "test")).toBe(loops("test", 0, 1, "autonomous (loops 1-3)"));
+	});
+
 	test("four fails: pending loop 4 needs coordinator approval", () => {
 		const { root, run } = initRepo();
 		for (let n = 1; n <= 4; n++) report(run, `test.${n}.json`, "fail");
