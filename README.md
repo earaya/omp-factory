@@ -29,6 +29,7 @@ Subagents run headless and cannot ask you anything. Only the main session can ra
 | `agents/factory-*.md` | Five specialist agents. Each has an `output:` JSON Schema, which is the handoff contract, and a `Verification criteria` section it self-checks before `yield`. |
 | `skills/factory/SKILL.md` | Coordinator playbook: triage, gates, waves, fix loops, integration, with a verification check after each phase |
 | `skills/factory/templates/` | Brief, decision ledger, run state, per-repo `RULES.md` |
+| `skills/factory/scripts/factory-state.sh` | Coordinator state helper: freeze record + sha (`freeze`), tree==freeze check (`verify`), persisted fix-loop count and ladder tier (`loops`) |
 | `hooks/pre/factory-guard.ts` | Blocks subagents from commit/push/merge/branch rewrites; only the coordinator integrates |
 | `config/config.example.yml` | Optional model roles and isolation settings |
 | `.omp/RULES.md` | Repo rules read by every agent, including subagents; Test: `bun test` |
