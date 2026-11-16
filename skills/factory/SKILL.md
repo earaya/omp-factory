@@ -83,12 +83,16 @@ Verify before continuing:
 
 Spawn one `factory-tester` with the Brief, packets, and ChangeReports. Persist the TestReport as a byte-copy of the raw yield (`agent://<id>:raw`) to `reports/test.<N>.json`.
 
-On `fail`: route each failure to its packet's implementer (send findings via a fresh spawn with the prior ChangeReport attached). Re-test. **At most 2 fix loops**, then escalate to the user with the failures.
+On `fail`: route each failure to its packet's implementer (send findings via a fresh spawn with the prior ChangeReport attached). Re-test. Looping is fine as long as you are not thrashing on the same issue — every attempt must address a novel defect and show phase-appropriate progress. Fix ladder, per test ledger:
+- loops 1–3: autonomous; log each in the `run.md` Log (defect, fix, generation);
+- loops 4–5: coordinator-approved only; record each grant in the decision ledger, with the loop logged in the `run.md` Log, and evidence that (a) the defect is novel (not a recurrence of an earlier finding) and (b) test progress since the last loop — fewer failing commands or unmet criteria per re-test;
+- 6th attempt: always `ask` the user with the failures.
+Thrash guard, independent of loop count: a recurrence of an earlier finding or absent progress (not fewer failing commands or unmet criteria) escalates immediately at any loop, whatever the tier.
 
 Verify before continuing:
 - re-run the §6 step-7 freeze recipe and require tree == freeze: `git hash-object` of the fresh list equals `run.md`'s `Freeze:` sha — mismatch = stale report → do not accept it, re-run the phase on the current tree (re-freezing first if the intervening edit was a sanctioned fix);
 - `reports/test.<N>.json` shows `verdict: pass`, every acceptance entry cites evidence, and every `commands[]` entry has a real result;
-- on `fail`, the fix loop above applies.
+- on `fail`, the fix ladder above applies.
 
 ## 8. Review
 
@@ -96,13 +100,17 @@ Run the diff yourself first: `git diff --stat <base>` plus the coverage sets —
 
 Spawn one `factory-reviewer` with the Brief, WorkPlan, reports, and the diff instruction: `git diff <base>` (the working tree against the base commit — nothing is committed until Gate 3) plus `git ls-files --others --exclude-standard` and `git diff --no-index /dev/null -- <file>` per untracked path (files the run creates stay untracked until Gate 3). Persist the ReviewReport as a byte-copy of the raw yield (`agent://<id>:raw`) to `reports/review.<N>.json`.
 
-On `changes_requested`: route blocker/major findings to implementers, re-test, re-review. **At most 2 loops**, then escalate. Never dismiss a blocker on your own; disagreeing with the reviewer is a user decision.
+On `changes_requested`: route blocker/major findings to implementers, re-test, re-review. Never dismiss a blocker on your own; disagreeing with the reviewer is a user decision. Looping is fine as long as you are not thrashing on the same issue — every attempt must address a novel defect and show phase-appropriate progress. Fix ladder, per review ledger:
+- loops 1–3: autonomous; log each in the `run.md` Log (defect, fix, generation);
+- loops 4–5: coordinator-approved only; record each grant in the decision ledger, with the loop logged in the `run.md` Log, and evidence that (a) the defect is novel (not a recurrence of an earlier finding) and (b) review progress since the last loop — fewer blocker/major findings, or strictly reduced severity, with no finding re-occurring after being marked fixed;
+- 6th attempt: always `ask` the user with the findings.
+Thrash guard, independent of loop count: a recurrence of an earlier finding (including one re-occurring after being marked fixed) or absent progress (not fewer blocker/major findings or reduced severity) escalates immediately at any loop, whatever the tier.
 
 Verify before continuing:
 - re-run the §6 step-7 freeze recipe and require tree == freeze: `git hash-object` of the fresh list equals `run.md`'s `Freeze:` sha — mismatch = stale report → do not accept it, re-run the phase on the current tree (re-freezing first if the intervening edit was a sanctioned fix);
 - `reports/review.<N>.json` shows `verdict: approve` with `scope_ok: true`;
 - every `findings[]` entry has a `location` (`path:line`);
-- on `changes_requested`, the loop above applies.
+- on `changes_requested`, the fix ladder above applies.
 
 ## 9. Integrate → Gate 3 (always)
 
@@ -123,9 +131,11 @@ Verify before Gate 3:
 - Every gate and escalation goes through `ask`. Batch questions; never ask one at a time.
 - Persist every handoff in the run dir before using it; the run dir is the source of truth if the session compacts or is resumed.
 - Update `run.md`'s status line after each phase so a resumed session knows where it is.
-- Persist every worker yield as a byte-copy of the raw payload (`read agent://<id>:raw`, write those exact bytes — never retype or re-render); coordinator annotations go to `<report>.notes.md` sidecars or the `run.md` Log, never inside a persisted report. Generation `<N>` counts spawns from 1 per artifact; earlier generations are never deleted or overwritten, and `run.md`'s Current-generations line points at the live one.
+- Persist every worker yield as a byte-copy of the raw payload (`read agent://<id>:raw`, write those exact bytes — never retype or re-render); coordinator annotations go to `<report>.notes.md` sidecars or the `run.md` Log, never inside a persisted report. Generation `<N>` counts persisted yield revisions from 1 per artifact (a fresh spawn or a steered re-run of an idle agent each produce the next generation); earlier generations are never deleted or overwritten, and `run.md`'s Current-generations line points at the live one.
 - A spawn that dies from model/config routing is coordinator-fixed and re-spawned; it consumes no §7/§8 fix-loop budget.
 - Treat every advisory/steering message as a finding: verify it against the tree, then adopt or reject with the reason logged in `run.md` — never adopt silently.
 - Plan amendments per §3: recorded in the `plan.<N>.amendments.json` sidecar plus `run.md`, or a planner re-spawn when structural.
 - You coordinate; workers implement. Do not write production code yourself except trivial integration fixes, which you record in `summary.md`.
 - Report only what tools showed. Unverified claims are marked `[INFERENCE]`.
+- Be transactional: write each spawn/persist/log claim only after the tool result confirms it, never before (run-2 slips: approval-less gate, pre-approval spawn, snapshot into a missing directory, phantom "spawned" log line).
+- Run meta-validation on each new playbook check: execute it once against a real tree (including a scratch R/C entry) before shipping it.
