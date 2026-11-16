@@ -10,11 +10,13 @@ flowchart TD
   D --> G2{Gate 2: blocking decisions}
   G2 --> I[factory-implementer per packet, in waves]
   I --> T[factory-tester: TestReport]
-  T -->|fail, max 2 loops| I
+  T -->|fail, loop ladder 3/2/6| I
   T --> R[factory-reviewer, different model: ReviewReport]
-  R -->|changes, max 2 loops| I
+  R -->|changes, loop ladder 3/2/6| I
   R --> G3{Gate 3: commit / push / PR}
 ```
+
+Fix-loop ladder (`3/2/6`): loops 1–3 autonomous, logged in the run; loops 4–5 coordinator-approved with decision-ledger evidence of a novel defect and phase-appropriate progress; 6th attempt asks the user. Thrash (a recurring finding or no progress) escalates immediately at any count.
 
 ## Why the coordinator is a skill
 
