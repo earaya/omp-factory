@@ -2,12 +2,12 @@
 
 ## Commands
 
-- Install: `none — markdown repo; Bun alone runs the tests`
+- Install: `none` (omp's bundled Bun runs the scripts and tests)
 - Build: `none`
 - Lint/format check: `none configured`
 - Typecheck: `none (Bun strips types; no tsconfig)`
-- Test (all): `bun test`
-- Test (one file): `bun test <path>`
+- Test (all): `bun test`, or `BUN_BE_BUN=1 "$(realpath "$(which omp)")" test` without a standalone Bun
+- Test (one file): same command plus `<path>`
 
 ## Never touch
 
@@ -16,9 +16,5 @@
 ## Conventions
 
 - Agent YAML frontmatter (`name`, `description`, `model`, `structured`, `tools`, `output`) is the contract — keep it valid YAML.
-- TypeScript uses tabs; markdown is docs.
+- TypeScript uses tabs. Scripts start with `#!/usr/bin/env -S BUN_BE_BUN=1 omp` and are executable; markdown is docs.
 - Terse imperative tone; no emojis in shipped docs.
-
-## Recipes
-
-- Parse agent YAML frontmatter: `bun -e 'const {parse}=await import("yaml");const t=await Bun.file(process.argv[2]||process.argv[1]).text();const m=t.match(/^---\n([\s\S]*?)\n---/);console.log(parse(m[1]));' <agent>.md` (dynamic import — CJS `require("yaml")` fails; the trailing argument is the agent file).

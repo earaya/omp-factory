@@ -2,7 +2,7 @@
 
 - **Run:** <slug>
 - **Requested:** <YYYY-MM-DD>
-- **Size:** small | standard | large
+- **Size:** small | standard
 
 ## Goal
 
@@ -29,10 +29,6 @@ Observable and checkable: a command passes, a test asserts a behavior, an output
 ## Context
 
 - <Relevant files with path:line and what they do>
-
-## Milestones (large only)
-
-1. <M1: shippable, verifiable outcome>
 
 ## Open questions
 

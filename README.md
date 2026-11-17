@@ -29,7 +29,7 @@ Subagents run headless and cannot ask you anything. Only the main session can ra
 - **Reviewers never re-litigate.** They receive the decision ledger. Disagreement with a decided choice becomes a new decision, not a finding. `taste` findings are always `nit` and go to Gate 3, never into the fix loop.
 - **Models are proven before work starts.** Pre-flight always spawns `factory-implementer` and `factory-reviewer`, plus any other agent on a different model, and each must return a schema-valid `yield` (a real tool call) before the baseline runs. The reviewers must be a different model family from the implementer. A failing model stops the run with the raw error, and role switches are session-only unless you choose to save them.
 - **Verdicts are relative to a baseline.** Checks run on the base commit first; pre-existing failures are not the run's failures.
-- **Nothing is committed before Gate 3.** The tree is frozen (`factory-state.sh freeze`) before test and review, and every report must match the freeze. The only exception: large tasks commit locally once per milestone, so each milestone has a diff base and a rollback point.
+- **Nothing is committed before Gate 3.** The tree is frozen (`factory-state.ts freeze`) before test and review, and every report must match the freeze.
 
 ## File ownership
 
@@ -39,14 +39,14 @@ Subagents run headless and cannot ask you anything. Only the main session can ra
 | `shares` | Several packets change logic in it | Sharers in one wave are serialized |
 | `requests` | Only an entry in a registry file (exports, routes, dependency lists) | The coordinator applies entries after the wave |
 
-Generated files (lockfiles, codegen) belong to no packet; the coordinator regenerates them. Shared types and signatures go in a wave-0 `contract` packet that others depend on. Large tasks run as **milestones**, each a full plan → review cycle with a gate where you can re-plan the rest.
+Generated files (lockfiles, codegen) belong to no packet; the coordinator regenerates them. Shared types and signatures go in a wave-0 `contract` packet that others depend on. A task too large for one run is split into several runs, each shippable on its own.
 
 ## Layout
 
 | Path | Purpose |
 |---|---|
-| `agents/factory-*.md` | Seven specialist agents. Each has an `output:` JSON Schema, which is the handoff contract, and a `Verification criteria` section it self-checks before `yield`. |
-| `skills/factory/SKILL.md` | Coordinator playbook: triage, baseline, gates, waves, fix loops, review rounds, milestones, integration, with a verification check after each phase |
+| `agents/factory-*.md` | Six specialist agents. Each has an `output:` JSON Schema, which is the handoff contract, and a `Verification criteria` section it self-checks before `yield`. |
+| `skills/factory/SKILL.md` | Coordinator playbook: triage, pre-flight, baseline, gates, waves, test, review rounds, fix ladder, integration |
 | `skills/factory/templates/` | Brief, decision ledger, run state, per-repo `RULES.md` |
 | `skills/factory/scripts/factory-state.ts` | Coordinator state helper: `freeze`, `verify` (tree == freeze), `snapshot`/`changed` (paths a wave touched), `coverage` (pre-review diff check), `loops test\|review\|security` (fix-loop count and ladder tier) |
 | `skills/factory-retro/SKILL.md` | Retro playbook: root-cause a finished run's friction signals against the factory and propose additions and deletions in one form |
@@ -60,7 +60,7 @@ Generated files (lockfiles, codegen) belong to no packet; the coordinator regene
 - [oh-my-pi](https://github.com/can1357/oh-my-pi) (`omp`) installed and configured with at least one model provider.
 - `git`. The coordinator creates a `factory/<slug>` branch in the target repo and refuses to start on a dirty working tree.
 - Models resolve from your OMP model roles: planner, designer, implementer and tester fall back to `@default`; both reviewers to `@advisor` (a different family on purpose). Optional `@factory_plan/impl/test/review` roles override a phase without code changes (see `config/config.example.yml`).
-- [Bun](https://bun.sh), only for running this repo's tests.
+- No other runtime: the scripts and tests run on omp's bundled Bun (a standalone [Bun](https://bun.sh) also works).
 
 ## Install
 
@@ -93,9 +93,8 @@ After a run, `/skill:factory-retro` turns one or more run directories into propo
 
 | Gate | When | You decide |
 |---|---|---|
-| 1 | Always, before planning | Brief, acceptance criteria, milestone outline (large), drafted `RULES.md`, non-green baseline |
+| 1 | Always, before planning | Brief, acceptance criteria, human-owned open questions, drafted `RULES.md`, non-green baseline |
 | 2 | Any blocking decision, or any decision not of kind `implementation` | Architecture, API, dependency, data, security and style choices; the packet table when architecture or contracts are involved |
-| Milestone | After each milestone (large) | Continue, re-plan the rest, or stop |
 | 3 | Always, before anything is committed | Taste findings to apply, reviewer decisions, commit, push, PR, or leave uncommitted |
 
 ## Guard hook limits
@@ -104,7 +103,7 @@ After a run, `/skill:factory-retro` turns one or more run directories into propo
 
 - It inspects `bash` tool calls only. Commands run through `eval` (for example a Python `subprocess` call) are not seen.
 - It matches command text with regular expressions and does not parse shell syntax. Aliases, variables, wrapper scripts and unusual flag orders can slip past it.
-- It does not restrict which files a subagent edits. The coordinator enforces packet file ownership by checking `git status` after each wave.
+- It does not restrict which files a subagent edits. The coordinator checks each wave's changed paths (`factory-state.ts changed`) against packet ownership.
 
 ## Tests
 
@@ -112,4 +111,4 @@ After a run, `/skill:factory-retro` turns one or more run directories into propo
 bun test
 ```
 
-Without a standalone Bun, omp's embedded one works: `BUN_BE_BUN=1 "$(realpath "$(which omp)")" test`. Tests cover the guard patterns, the state helper and recipes, the retro collector, and keep the copied `decisions[]` and ReviewReport schemas identical across agents (omp has no schema `$ref`).
+Without a standalone Bun, omp's embedded one works: `BUN_BE_BUN=1 "$(realpath "$(which omp)")" test`. Tests cover the guard patterns, the state helper, the retro collector, and keep the copied `decisions[]` and ReviewReport schemas identical across agents (omp has no schema `$ref`).
