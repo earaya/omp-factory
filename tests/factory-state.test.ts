@@ -107,20 +107,20 @@ describe("factory-state.ts freeze", () => {
 
 	test("special-character paths are escaped and round-trip", () => {
 		const { root, repo, run } = initRepo({ "plain.txt": "p\n" });
-		const names = { "sp ace.txt": "s\n", "ta\tb.txt": "t\n", "uni-é.txt": "u\n" };
+		const names = { "sp ace.txt": "s\n", "ta\tb.txt": "t\n", "new\nline.txt": "n\n", "uni-é.txt": "u\n" };
 		for (const [name, content] of Object.entries(names)) writeFileSync(join(repo, name), content);
 		sh(root, "freeze", run);
 		const lines = freezeLines(run);
-		expect(lines.length).toBe(3);
+		expect(lines.length).toBe(4); // a raw newline in a path would split its entry into two lines
 		for (const [name, content] of Object.entries(names)) {
 			const line = lines.find(l => unescape(l.split("\t")[1]) === name);
 			expect(line).toBeDefined();
 			const fields = line!.split("\t");
 			expect(fields.length).toBe(3); // tab-in-name stays one field: escaping keeps the record parseable
 			expect(fields[2]).toBe(blobSha(content));
-			if (name.includes("\t")) {
-				expect(line!.includes(name)).toBe(false); // raw tab absent; the escaped form is present
-				expect(fields[1]).toContain("\\t");
+			if (name.includes("\t") || name.includes("\n")) {
+				expect(line!.includes(name)).toBe(false); // raw tab/newline absent; the escaped form is present
+				expect(fields[1]).toContain(name.includes("\t") ? "\\t" : "\\n");
 			}
 		}
 	});

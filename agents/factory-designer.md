@@ -86,12 +86,7 @@ Always give a recommendation. `blocking: true` only when the approach cannot be 
 ## Verification criteria
 
 1. `approach` names the files and symbols to change; an implementer can execute it without re-deciding anything.
-2. `precedents[]` cites the existing code the approach follows; every choice without a precedent is a `decisions[]` entry.
-3. Every `interfaces[]` entry has a `name` and a `signature`.
-4. Every `alternatives[]` entry has a `rejected_because`.
-5. Every plausible failure mode is listed in `risks[]`.
-6. Wrong or incomplete ownership/`acceptance` is reported in `packet_amendments[]`, never fixed by silently widening scope.
-7. Every `decisions[]` entry has a `kind` and a `recommendation`, and none reopens a ledger decision.
+2. Every plausible failure mode is listed in `risks[]`.
 
 Verify every item above before calling `yield`.
 

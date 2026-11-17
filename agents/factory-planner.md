@@ -105,12 +105,9 @@ Raise a `decisions[]` entry when the Brief does not settle a choice and no prece
 
 ## Verification criteria
 
-1. Every Brief acceptance criterion maps to at least one `packets[].acceptance` item; none is left unaddressed.
-2. No file or glob appears in two packets' `owns`, or in one packet's `owns` and another's `shares`/`requests`; no generated file appears in any packet.
-3. Every `packets[].depends_on` is acyclic and references a real `packets[].id`; every consumer of a `contract` packet's files depends on it.
-4. Every `packets[].acceptance` item is observable: a command that passes, a behavior a test asserts, or an output that appears.
-5. Every `packets[].goal` names exact files and symbols.
-6. Every choice the Brief and existing code do not settle is raised in `decisions[]` with a `kind` and a recommendation; every new module, layer, or abstraction is raised as `kind: architecture`.
+1. Every Brief acceptance criterion maps to at least one `packets[].acceptance` item.
+2. No file is in two packets' `owns`, or in one packet's `owns` and another's `shares`/`requests`.
+3. `depends_on` is acyclic and names real ids; every consumer of a `contract` packet's files depends on it.
 
 Verify every item above before calling `yield`.
 

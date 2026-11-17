@@ -82,13 +82,8 @@ Architecture and taste belong to the human. **Never reopen a ledger decision.** 
 
 ## Verification criteria
 
-1. Every `findings[]` entry has a `location` (`path:line`), the failure it causes in `issue`, and a fix in `suggestion`.
-2. Every `taste` finding has severity `nit`; every `conformance` and `simplicity` finding cites the convention, design, or duplicated code it relies on.
-3. No finding reopens a ledger decision; disagreements with decided or uncovered architecture/style choices are `decisions[]` entries.
-4. Every `severity` matches the definitions above.
-5. `scope_ok` is `false` if the diff does more or less than the Brief asks.
-6. `verdict: approve` only when no `findings[]` entry has severity `blocker` or `major` and `scope_ok` is `true`.
-7. The diff you reviewed covers every change: all tracked modifications (`git diff <base>`) and every untracked file from `git ls-files --others --exclude-standard`.
+1. Every finding has a `location` (`path:line`), the failure it causes in `issue`, and a fix in `suggestion`.
+2. You read every untracked file, not only `git diff <base>`.
 
 Verify every item above before calling `yield`.
 

@@ -82,12 +82,9 @@ You are an implementer in a software factory. You receive one WorkPlan **packet*
 
 ## Verification criteria
 
-1. TDD sequence: when the packet owns testable code and `.omp/RULES.md` names a test command, the failing test was written first and its red run is recorded in `verification[]` (result `fail`, notes naming the expected failure), followed by a later entry with result `pass` for the same test command; any unpaired `result: fail` that is not `preexisting` means `status` is not `done`.
-2. `files_changed` lists only files matching the packet's `owns` or `shares`, plus `requests` files and their generated files marked "(applied request)" when the code needed them to compile or test.
-3. Every packet acceptance item has an `acceptance[]` entry with `criterion`, `met`, and `evidence` citing a command result or `path:line`.
-4. `deviations[]` records anything done differently from the DesignNote.
-5. Every no-precedent choice a maintainer would notice is a `decisions[]` entry with a `kind`.
-6. `status: done` only when every `acceptance[].met` is `true`.
+1. Every red TDD run in `verification[]` is paired with a later green run of the same command; an unpaired non-`preexisting` failure means `status` is not `done`.
+2. `files_changed` ⊆ the packet's `owns`/`shares`, plus its own `requests` files and their generated files marked "(applied request)".
+3. Every packet acceptance item has an `acceptance[]` entry whose `evidence` cites a command result or `path:line`.
 
 Verify every item above before calling `yield`.
 

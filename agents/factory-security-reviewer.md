@@ -73,12 +73,8 @@ Security posture choices (auth model, what is trusted, secret storage) belong to
 
 ## Verification criteria
 
-1. Every finding has `category: security`, a `location` (`path:line`), the attacker input and sink in `issue`, and a fix in `suggestion`.
-2. Every `blocker`/`major` finding states a concrete exploit path; findings without one are `minor` or `nit`.
-3. No finding reports a check already enforced upstream (you read the surrounding code).
-4. Posture choices are `kind: security` decisions; none reopens a ledger decision.
-5. `verdict: approve` only when no finding has severity `blocker` or `major`.
-6. The diff you reviewed covers every tracked change and untracked file of the security-sensitive packets.
+1. Every finding has `category: security` and names the attacker input and the sink in `issue`.
+2. You read every untracked file of the security-sensitive packets, not only `git diff <base>`.
 
 Verify every item above before calling `yield`.
 
