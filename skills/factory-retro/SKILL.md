@@ -12,7 +12,7 @@ Inputs: one or more run directories (`.factory/runs/<slug>/`). No directory give
 ## 1. Collect
 
 ```bash
-bash "${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/skills/factory-retro/scripts/factory-retro.sh" collect <run-dir> [<run-dir>...]
+"${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/skills/factory-retro/scripts/factory-retro.ts" collect <run-dir> [<run-dir>...]
 ```
 
 Exit 2 → report the stderr message and stop. One directory prints the run object; several print `{runs, totals}`.

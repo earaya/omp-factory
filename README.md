@@ -48,9 +48,9 @@ Generated files (lockfiles, codegen) belong to no packet; the coordinator regene
 | `agents/factory-*.md` | Seven specialist agents. Each has an `output:` JSON Schema, which is the handoff contract, and a `Verification criteria` section it self-checks before `yield`. |
 | `skills/factory/SKILL.md` | Coordinator playbook: triage, baseline, gates, waves, fix loops, review rounds, milestones, integration, with a verification check after each phase |
 | `skills/factory/templates/` | Brief, decision ledger, run state, per-repo `RULES.md` |
-| `skills/factory/scripts/factory-state.sh` | Coordinator state helper: freeze record + sha (`freeze`), tree==freeze check (`verify`), persisted fix-loop count and ladder tier (`loops test|review|security`) |
+| `skills/factory/scripts/factory-state.ts` | Coordinator state helper: `freeze`, `verify` (tree == freeze), `snapshot`/`changed` (paths a wave touched), `coverage` (pre-review diff check), `loops test\|review\|security` (fix-loop count and ladder tier) |
 | `skills/factory-retro/SKILL.md` | Retro playbook: root-cause a finished run's friction signals against the factory and propose additions and deletions in one form |
-| `skills/factory-retro/scripts/factory-retro.sh` | Retro collector: `collect <run-dir>...` prints a run's friction signals (re-plans, amendments, schema failures, advisories, applied requests, deviations, fix loops, decisions) as JSON |
+| `skills/factory-retro/scripts/factory-retro.ts` | Retro collector: `collect <run-dir>...` prints a run's friction signals (re-plans, amendments, schema failures, advisories, applied requests, deviations, fix loops, decisions) as JSON |
 | `hooks/pre/factory-guard.ts` | Blocks subagents from git history, branch, checkout/restore/reset and GitHub mutations; only the coordinator integrates |
 | `config/config.example.yml` | Optional model roles |
 | `.omp/RULES.md` | Repo rules read by every agent, including subagents; Test: `bun test` |

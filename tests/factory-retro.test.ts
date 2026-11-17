@@ -4,9 +4,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-// Covers skills/factory-retro/scripts/factory-retro.sh — the retro collector.
+// Covers skills/factory-retro/scripts/factory-retro.ts, the retro collector.
 // Fixture run dirs live in mkdtemp, never this tree.
-const SCRIPT = join(import.meta.dir, "..", "skills", "factory-retro", "scripts", "factory-retro.sh");
+const SCRIPT = join(import.meta.dir, "..", "skills", "factory-retro", "scripts", "factory-retro.ts");
 
 // allowlist, never a process.env spread
 function fixtureEnv(root: string): Record<string, string> {
@@ -41,10 +41,10 @@ function mkRun(root: string, name: string, files: Record<string, string> = {}): 
 }
 
 const run = (root: string, ...args: string[]) =>
-	spawnSync("bash", [SCRIPT, ...args], { cwd: root, env: fixtureEnv(root), encoding: "utf8" });
+	spawnSync(SCRIPT, args, { cwd: root, env: fixtureEnv(root), encoding: "utf8" });
 
 const collect = (root: string, ...runs: string[]) =>
-	JSON.parse(execFileSync("bash", [SCRIPT, "collect", ...runs], { cwd: root, env: fixtureEnv(root), encoding: "utf8" }));
+	JSON.parse(execFileSync(SCRIPT, ["collect", ...runs], { cwd: root, env: fixtureEnv(root), encoding: "utf8" }));
 
 const runMd = (log: string[], tail = "") =>
 	["# Run: x", "", "## Files", "", "- not a log line, before the heading", "", "## Log", "", ...log, tail].join("\n") + "\n";
@@ -61,14 +61,14 @@ const empty = (name: string) => ({
 	decisions: { user: 0, auto: 0, total: 0 },
 });
 
-describe("factory-retro.sh usage", () => {
+describe("factory-retro.ts usage", () => {
 	test("no command or no run dir: usage on stderr, exit 2", () => {
 		const root = mkRoot();
 		for (const args of [[], ["collect"], ["bogus"]]) {
 			const r = run(root, ...args);
 			expect(r.status).toBe(2);
 			expect(r.stdout).toBe("");
-			expect(r.stderr).toContain("usage: factory-retro.sh");
+			expect(r.stderr).toContain("usage: factory-retro.ts");
 		}
 	});
 
@@ -83,7 +83,7 @@ describe("factory-retro.sh usage", () => {
 	});
 });
 
-describe("factory-retro.sh collect", () => {
+describe("factory-retro.ts collect", () => {
 	test("empty run dir: all counts 0, loops null, exit 0", () => {
 		const root = mkRoot();
 		const r = run(root, "collect", mkRun(root, "empty-run"));
@@ -143,17 +143,15 @@ describe("factory-retro.sh collect", () => {
 			JSON.stringify({ files_changed: [], deviations: ["ok", 3] }),
 			JSON.stringify({ files_changed: [1], deviations: [] }),
 		];
-		for (const shell of ["bash", "/bin/bash"]) {
-			for (const content of bad) {
-				const root = mkRoot();
-				const ok = mkRun(root, "ok");
-				const r = mkRun(root, "r", { "reports/P1.change.1.json": content, "reports/P2.change.1.json": valid });
-				for (const runs of [[r], [ok, r], [r, ok]]) {
-					const res = spawnSync(shell, [SCRIPT, "collect", ...runs], { cwd: root, env: fixtureEnv(root), encoding: "utf8" });
-					expect(res.status).toBe(2);
-					expect(res.stdout).toBe("");
-					expect(res.stderr).toContain("P1.change.1.json");
-				}
+		for (const content of bad) {
+			const root = mkRoot();
+			const ok = mkRun(root, "ok");
+			const r = mkRun(root, "r", { "reports/P1.change.1.json": content, "reports/P2.change.1.json": valid });
+			for (const runs of [[r], [ok, r], [r, ok]]) {
+				const res = run(root, "collect", ...runs);
+				expect(res.status).toBe(2);
+				expect(res.stdout).toBe("");
+				expect(res.stderr).toContain("P1.change.1.json");
 			}
 		}
 	});
@@ -171,17 +169,15 @@ describe("factory-retro.sh collect", () => {
 
 	test("loops: a non-JSON, non-object, or non-string-verdict phase report fails the collect with exit 2, naming the file", () => {
 		const bad = ["not json", JSON.stringify(["approve"]), JSON.stringify({ verdict: 1 }), JSON.stringify({ verdict: ["approve"] })];
-		for (const shell of ["bash", "/bin/bash"]) {
-			for (const content of bad) {
-				const root = mkRoot();
-				const ok = mkRun(root, "ok");
-				const r = mkRun(root, "r", { "reports/review.1.json": content });
-				for (const runs of [[r], [ok, r], [r, ok]]) {
-					const res = spawnSync(shell, [SCRIPT, "collect", ...runs], { cwd: root, env: fixtureEnv(root), encoding: "utf8" });
-					expect(res.status).toBe(2);
-					expect(res.stdout).toBe("");
-					expect(res.stderr).toContain("review.1.json");
-				}
+		for (const content of bad) {
+			const root = mkRoot();
+			const ok = mkRun(root, "ok");
+			const r = mkRun(root, "r", { "reports/review.1.json": content });
+			for (const runs of [[r], [ok, r], [r, ok]]) {
+				const res = run(root, "collect", ...runs);
+				expect(res.status).toBe(2);
+				expect(res.stdout).toBe("");
+				expect(res.stderr).toContain("review.1.json");
 			}
 		}
 	});
@@ -382,14 +378,14 @@ describe("factory-retro.sh collect", () => {
 	});
 
 	test("invocation via the canonical installed path (hermetic temp agent dir)", () => {
-		// SKILL.md runs ${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/skills/factory-retro/scripts/factory-retro.sh,
+		// SKILL.md runs ${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/skills/factory-retro/scripts/factory-retro.ts,
 		// which install.sh symlinks; build that layout in a temp agent dir.
 		const root = mkRoot();
 		const agentDir = join(root, "agent");
 		mkdirSync(join(agentDir, "skills"), { recursive: true });
 		execFileSync("ln", ["-s", join(import.meta.dir, "..", "skills", "factory-retro"), join(agentDir, "skills", "factory-retro")]);
-		const installed = join(agentDir, "skills", "factory-retro", "scripts", "factory-retro.sh");
-		const out = execFileSync("bash", [installed, "collect", mkRun(root, "r")], {
+		const installed = join(agentDir, "skills", "factory-retro", "scripts", "factory-retro.ts");
+		const out = execFileSync(installed, ["collect", mkRun(root, "r")], {
 			cwd: root, env: { ...fixtureEnv(root), PI_CODING_AGENT_DIR: agentDir }, encoding: "utf8",
 		});
 		expect(JSON.parse(out)).toEqual(empty("r"));

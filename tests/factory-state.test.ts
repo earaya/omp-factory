@@ -5,9 +5,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-// Covers scripts/factory-state.sh, the coordinator state helper. Fixtures are
+// Covers skills/factory/scripts/factory-state.ts, the coordinator state helper. Fixtures are
 // mkdtemp repos with the run dir outside the repo, so the record never lists it.
-const SCRIPT = join(import.meta.dir, "..", "skills", "factory", "scripts", "factory-state.sh");
+const SCRIPT = join(import.meta.dir, "..", "skills", "factory", "scripts", "factory-state.ts");
 
 // allowlist, never a process.env spread — host GIT_* would leak into fixtures
 function fixtureEnv(root: string): Record<string, string> {
@@ -55,18 +55,18 @@ function initRepo(baseFiles?: Record<string, string>): { root: string; repo: str
 }
 
 const sh = (root: string, ...args: string[]) =>
-	execFileSync("bash", [SCRIPT, ...args], { cwd: join(root, "repo"), env: fixtureEnv(root), encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }).trim();
+	execFileSync(SCRIPT, args, { cwd: join(root, "repo"), env: fixtureEnv(root), encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }).trim();
 
 function blobSha(content: string): string {
 	return createHash("sha1").update(`blob ${Buffer.byteLength(content)}\0${content}`).digest("hex");
 }
 
-const unescape = (root: string, escaped: string) =>
-	execFileSync("bash", ["-c", `printf %s ${escaped}`], { env: fixtureEnv(root), encoding: "utf8" });
+// Inverse of the record's path escaping: \\ \t \n.
+const unescape = (escaped: string) => escaped.replace(/\\([\\tn])/g, (_, c) => (c === "t" ? "\t" : c === "n" ? "\n" : "\\"));
 
 const freezeLines = (run: string) => readFileSync(join(run, "reports", "freeze.txt"), "utf8").split("\n").filter(l => l !== "");
 
-describe("factory-state.sh freeze", () => {
+describe("factory-state.ts freeze", () => {
 	test("writes the §6 step-7 record and prints its sha", () => {
 		const { root, repo, run } = initRepo({ "a.txt": "alpha\n", "c.txt": "gamma\n" });
 		writeFileSync(join(repo, "a.txt"), "alpha2\n"); // M
@@ -99,13 +99,13 @@ describe("factory-state.sh freeze", () => {
 		const fields = lines[0].split("\t");
 		expect(fields.length).toBe(4);
 		expect(fields[0]).toBe("R ");
-		expect(unescape(root, fields[1])).toBe("new.txt"); // field 2: destination
+		expect(unescape(fields[1])).toBe("new.txt"); // field 2: destination
 		expect(fields[2]).toBe(blobSha("renamed\n"));      // field 3: worktree content of dest
-		expect(unescape(root, fields[3])).toBe("old.txt"); // field 4: renamed-from, metadata
+		expect(unescape(fields[3])).toBe("old.txt"); // field 4: renamed-from, metadata
 		expect(lines[1].split("\t").slice(0, 2)).toEqual(["??", "u.txt"]); // second entry intact
 	});
 
-	test("special-character paths are %q-escaped and round-trip", () => {
+	test("special-character paths are escaped and round-trip", () => {
 		const { root, repo, run } = initRepo({ "plain.txt": "p\n" });
 		const names = { "sp ace.txt": "s\n", "ta\tb.txt": "t\n", "uni-é.txt": "u\n" };
 		for (const [name, content] of Object.entries(names)) writeFileSync(join(repo, name), content);
@@ -113,14 +113,14 @@ describe("factory-state.sh freeze", () => {
 		const lines = freezeLines(run);
 		expect(lines.length).toBe(3);
 		for (const [name, content] of Object.entries(names)) {
-			const line = lines.find(l => unescape(root, l.split("\t")[1]) === name);
+			const line = lines.find(l => unescape(l.split("\t")[1]) === name);
 			expect(line).toBeDefined();
 			const fields = line!.split("\t");
 			expect(fields.length).toBe(3); // tab-in-name stays one field: escaping keeps the record parseable
 			expect(fields[2]).toBe(blobSha(content));
-			if (name !== "uni-é.txt") {
-				expect(line!.includes(name)).toBe(false); // raw name absent; the escaped form is present
-				expect(fields[1]).toContain("\\");
+			if (name.includes("\t")) {
+				expect(line!.includes(name)).toBe(false); // raw tab absent; the escaped form is present
+				expect(fields[1]).toContain("\\t");
 			}
 		}
 	});
@@ -133,7 +133,7 @@ describe("factory-state.sh freeze", () => {
 	});
 });
 
-describe("factory-state.sh verify", () => {
+describe("factory-state.ts verify", () => {
 	test("exit 0 on an untouched tree; exit 1 stale after an edit; re-freeze restores", () => {
 		const { root, repo, run } = initRepo({ "a.txt": "alpha\n" });
 		writeFileSync(join(repo, "a.txt"), "alpha2\n");
@@ -160,7 +160,7 @@ function attempt(root: string, ...args: string[]): { status: number; out: string
 	}
 }
 
-describe("factory-state.sh snapshot / changed", () => {
+describe("factory-state.ts snapshot / changed", () => {
 	test("changed lists only what the wave touched, escaped and sorted", () => {
 		const { root, repo, run } = initRepo({ "a.txt": "a\n", "b.txt": "b\n" });
 		writeFileSync(join(repo, "a.txt"), "a2\n"); // earlier wave's edit
@@ -168,7 +168,7 @@ describe("factory-state.sh snapshot / changed", () => {
 		expect(readFileSync(join(run, "reports", "status-wave-1.before"), "utf8")).toContain("a.txt");
 		writeFileSync(join(repo, "b.txt"), "b2\n");
 		writeFileSync(join(repo, "n ew.txt"), "n\n");
-		expect(sh(root, "changed", run, "1").split("\n")).toEqual(["b.txt", "n\\ ew.txt"]);
+		expect(sh(root, "changed", run, "1").split("\n")).toEqual(["b.txt", "n ew.txt"]);
 	});
 
 	test("a re-edit of an earlier wave's file counts; a removed entry counts", () => {
@@ -191,7 +191,7 @@ describe("factory-state.sh snapshot / changed", () => {
 	});
 });
 
-describe("factory-state.sh coverage", () => {
+describe("factory-state.ts coverage", () => {
 	const base = (root: string, repo: string) => gitIn(root, repo, "rev-parse", "HEAD").trim();
 	const writeFreeze = (run: string, lines: string[]) => {
 		mkdirSync(join(run, "reports"), { recursive: true });
@@ -241,12 +241,12 @@ describe("factory-state.sh coverage", () => {
 		const { root, repo, run } = initRepo({ "dir sp/file sp.txt": "v1\n" });
 		writeFileSync(join(repo, "dir sp", "file sp.txt"), "v2\n");
 		sh(root, "freeze", run);
-		expect(freezeLines(run)[0].split("\t")[1]).toBe("dir\\ sp/file\\ sp.txt");
+		expect(freezeLines(run)[0].split("\t")[1]).toBe("dir sp/file sp.txt");
 		expect(sh(root, "coverage", run, base(root, repo))).toBe("coverage ok");
 	});
 });
 
-describe("factory-state.sh loops", () => {
+describe("factory-state.ts loops", () => {
 	const report = (run: string, name: string, verdict: string) => {
 		const reports = join(run, "reports");
 		mkdirSync(reports, { recursive: true });
@@ -271,11 +271,11 @@ describe("factory-state.sh loops", () => {
 		const agentDir = join(mkdtempSync(join(tmpdir(), "factory-agent-")), "agent");
 		dirs.push(dirname(agentDir));
 		mkdirSync(join(agentDir, "skills", "factory", "scripts"), { recursive: true });
-		symlinkSync(SCRIPT, join(agentDir, "skills", "factory", "scripts", "factory-state.sh"));
+		symlinkSync(SCRIPT, join(agentDir, "skills", "factory", "scripts", "factory-state.ts"));
 		const { root, run } = initRepo({ "a.txt": "a\n" });
 		const env = { ...fixtureEnv(root), PI_CODING_AGENT_DIR: agentDir };
-		const installed = join(agentDir, "skills", "factory", "scripts", "factory-state.sh");
-		const out = execFileSync("bash", [installed, "loops", run, "test"], { cwd: join(root, "repo"), env, encoding: "utf8" }).trim();
+		const installed = join(agentDir, "skills", "factory", "scripts", "factory-state.ts");
+		const out = execFileSync(installed, ["loops", run, "test"], { cwd: join(root, "repo"), env, encoding: "utf8" }).trim();
 		expect(out).toBe("test fix loops: 0 completed, no pending attempt — autonomous (loops 1-3)");
 	});
 
