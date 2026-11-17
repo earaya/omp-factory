@@ -3,7 +3,7 @@
 - **Status:** setup | gate1 | planning | design | gate2 | implementing:wave-N | testing | reviewing | gate3 | done | stopped
 - **Repo:** <root>
 - **Base:** <sha> on <branch>
-- **Run branch:** factory/<slug>
+- **Run branch:** factory/<slug> | <existing branch named by the user>
 - **Baseline:** <green | N failing> (reports/baseline.json)
 - **Freeze:** <sha> (reports/freeze.txt)
 - **Current generations:** plan.<N> · <P>.change.<N> · test.<N> · review.<N> · security.<N>

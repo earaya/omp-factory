@@ -77,7 +77,7 @@ Gate 2 fires when any question exists: one `ask` form, each question a radio gro
 
 ## 6. Implement
 
-1. `git switch -c factory/<slug>` from `base`.
+1. Run branch: if the user names an existing branch to integrate on, stay on it and record it as the Run branch; otherwise `git switch -c factory/<slug>` from `base`.
 2. Order packets into **waves** by `depends_on`; `contract` packets form wave 0. Packets share one checkout. Two packets in one wave listing the same `shares` or `requests` file, or running the same heavyweight build/test → move the later one (by id) to the next wave.
 3. Before each wave: `factory-state snapshot <run-dir> <N>`.
 4. Spawn one `factory-implementer` per packet in one `tasks[]` batch. Each item: the packet JSON, its DesignNote, the ledger decisions that affect it, `reports/baseline.json`, the Brief path. Workers start blank.
@@ -121,7 +121,7 @@ Thrash guard, at any loop: a recurrence of an earlier finding, or no progress (t
 ## 9. Integrate → Gate 3 (always)
 
 1. Write `summary.md`: what changed, acceptance status, test results against the baseline, review results, every decision and who made it, remaining risks.
-2. **Gate 3** `ask`: the summary, `git diff --stat <base>`, untracked files, open `taste` findings (checkboxes: which to apply), pending reviewer decisions (radio groups), and: commit on `factory/<slug>` (preselected) / commit and push the branch / commit, push, and open a PR / leave uncommitted.
+2. **Gate 3** `ask`: the summary, `git diff --stat <base>`, untracked files, open `taste` findings (checkboxes: which to apply), pending reviewer decisions (radio groups), and: commit on the Run branch (preselected) / commit and push it / commit, push, and open a PR / leave uncommitted.
 3. Selected taste findings or decisions that change code → one implementer round, re-test, re-freeze; no new review unless the change exceeds what was named.
 4. Do exactly what was chosen. Message: conventional summary line plus body from `summary.md`. Use the existing remote; never force-push, never merge to the default branch.
 
