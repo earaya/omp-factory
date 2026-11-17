@@ -4,7 +4,7 @@ A software factory for [oh-my-pi](https://github.com/can1357/oh-my-pi): a main-s
 
 ```mermaid
 flowchart TD
-  U[Task] --> B[Brief + baseline checks] --> G1{Gate 1: approve brief}
+  U[Task] --> M[Pre-flight: smoke every model with a tool call] --> B[Brief + baseline checks] --> G1{Gate 1: approve brief}
   G1 --> P[factory-planner: WorkPlan]
   P --> D[factory-designer: DesignNote per risky packet]
   D --> G2{Gate 2: human-owned decisions}
@@ -27,6 +27,7 @@ Subagents run headless and cannot ask you anything. Only the main session can ra
 
 - **The human owns architecture and taste.** Every decision has a `kind`. Only non-blocking `implementation` decisions are auto-adopted; `architecture`, `public_api`, `dependency`, `data`, `security` and `style` always reach a gate, with the recommendation preselected. Existing code is precedent, not taste: following it raises nothing.
 - **Reviewers never re-litigate.** They receive the decision ledger. Disagreement with a decided choice becomes a new decision, not a finding. `taste` findings are always `nit` and go to Gate 3, never into the fix loop.
+- **Models are proven before work starts.** Pre-flight spawns each distinct model once and requires a schema-valid `yield` (a real tool call) before the baseline runs; the reviewers must be a different model family from the implementer. A failing model stops the run with the raw error, and role switches are session-only unless you choose to save them.
 - **Verdicts are relative to a baseline.** Checks run on the base commit first; pre-existing failures are not the run's failures.
 - **Nothing is committed before Gate 3.** The tree is frozen (`factory-state.sh freeze`) before test and review, and every report must match the freeze. The only exception: large tasks commit locally once per milestone, so each milestone has a diff base and a rollback point.
 

@@ -16,6 +16,7 @@
 |---|---|---|
 | brief.md | coordinator | Brief |
 | reports/baseline.json | coordinator | Baseline check results on base |
+| reports/preflight.json | coordinator | Agent → resolved model, smoke result and raw error per model |
 | plan.<N>.json / plan.<N>.md | factory-planner | WorkPlan |
 | designs/<P>.<N>.json | factory-designer | DesignNote |
 | decisions.md | coordinator | Decision ledger |
