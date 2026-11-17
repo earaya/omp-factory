@@ -13,7 +13,7 @@
 
 Files no packet edits; the coordinator regenerates them after each wave.
 
-- `<path or glob>`: `<regenerate command>` (e.g. `go.sum`: `go mod tidy`)
+- `<path or glob>`: `<regenerate command>` (e.g. `go.sum`: `go mod tidy`; `package-lock.json`: `npm install`; `poetry.lock`: `poetry lock`)
 
 ## Never touch
 

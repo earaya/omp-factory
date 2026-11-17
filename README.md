@@ -83,7 +83,7 @@ To specialize a role for one repo, add `.omp/agents/factory-tester.md` (or anoth
 ## Use
 
 ```
-/skill:factory-spec Move every cache family from memcached to Redis
+/skill:factory-spec Migrate the order service from REST polling to webhooks
 /skill:factory Add rate limiting to the public API
 /skill:factory-retro <run-dir>...
 ```

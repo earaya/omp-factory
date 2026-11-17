@@ -78,7 +78,7 @@ for (const d of decisions) {
 
 // A run's Acceptance must not assert a value an open decision still owns. Reserved
 // tokens are the identifiers inside backticked spans of an open decision's
-// Recommendation (`{rightType: IP_ALLOWLIST}` yields rightType and IP_ALLOWLIST).
+// Recommendation (`{type: ORDER_UPDATED}` yields type and ORDER_UPDATED).
 const reserved = decisions.flatMap(d =>
 	open.includes(d.id)
 		? [...(field(d.body, "Recommendation") ?? "").matchAll(/`([^`]+)`/g)].flatMap(m =>
@@ -88,7 +88,7 @@ const reserved = decisions.flatMap(d =>
 );
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // Backticked anywhere; bare only when unambiguous (ALL_CAPS or a dotted field), so
-// a plain word like customer in "customer id" is not a hit.
+// a plain word like tenant in "tenant id" is not a hit.
 const asserts = (text: string, token: string) =>
 	text.includes(`\`${token}\``) ||
 	((/^[A-Z][A-Z0-9_]+$/.test(token) || token.includes(".")) && new RegExp(`(^|[^\\w.])${escape(token)}($|[^\\w.])`).test(text));

@@ -55,19 +55,19 @@ describe("factory-spec.ts check", () => {
 			...good,
 			"decisions.md": ledger(
 				entry("D1", "`a`"),
-				entry("D2", "open", "- **Recommendation:** header `customer`; `{rightType: IP_ALLOWLIST}`\n"),
+				entry("D2", "open", "- **Recommendation:** header `tenant`; `{type: ORDER_UPDATED}`\n"),
 				entry("D3", "`b`"),
 			),
-			"roadmap.md": `${run("R1")}${run("R2", "- **Goal:** g\n- **Scope:** s, per `IP_ALLOWLIST`\n- **Acceptance:** header `customer` set, type IP_ALLOWLIST, customer id present\n")}`,
+			"roadmap.md": `${run("R1")}${run("R2", "- **Goal:** g\n- **Scope:** s, per `ORDER_UPDATED`\n- **Acceptance:** header `tenant` set, type ORDER_UPDATED, tenant id present\n")}`,
 		};
 		const r = check(files);
 		expect(r.status).toBe(1);
-		expect(r.stderr).toContain("R2: Acceptance asserts `customer`, which open D2 still decides"); // backticked
-		expect(r.stderr).toContain("R2: Acceptance asserts `IP_ALLOWLIST`, which open D2 still decides"); // bare ALL_CAPS inside a long span
-		files["roadmap.md"] = `${run("R1")}${run("R2", "- **Goal:** g\n- **Scope:** per `IP_ALLOWLIST`\n- **Acceptance:** the shape D2 decides; customer id present\n")}`;
+		expect(r.stderr).toContain("R2: Acceptance asserts `tenant`, which open D2 still decides"); // backticked
+		expect(r.stderr).toContain("R2: Acceptance asserts `ORDER_UPDATED`, which open D2 still decides"); // bare ALL_CAPS inside a long span
+		files["roadmap.md"] = `${run("R1")}${run("R2", "- **Goal:** g\n- **Scope:** per `ORDER_UPDATED`\n- **Acceptance:** the shape D2 decides; tenant id present\n")}`;
 		expect(check(files).status).toBe(0); // Scope may name it; a plain word is not a hit
-		files["roadmap.md"] = `${run("R1")}${run("R2", "- **Goal:** g\n- **Scope:** s\n- **Acceptance:** header `customer` set\n")}`;
-		files["decisions.md"] = ledger(entry("D1", "`a`"), entry("D2", "`header`", "- **Recommendation:** header `customer`\n"), entry("D3", "`b`"));
+		files["roadmap.md"] = `${run("R1")}${run("R2", "- **Goal:** g\n- **Scope:** s\n- **Acceptance:** header `tenant` set\n")}`;
+		files["decisions.md"] = ledger(entry("D1", "`a`"), entry("D2", "`header`", "- **Recommendation:** header `tenant`\n"), entry("D3", "`b`"));
 		expect(check(files).status).toBe(0); // decided: asserting it is fine
 	});
 
