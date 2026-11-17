@@ -1,8 +1,8 @@
 # Merge into ~/.omp/agent/config.yml (optional).
 #
 # Factory agents resolve their model from your OMP model roles:
-#   planner / designer / implementer / integrator / tester -> @default
-#   reviewer / security reviewer                           -> @advisor  (a different family on purpose)
+#   planner / designer / implementer / tester -> @default
+#   reviewer / security reviewer              -> @advisor  (a different family on purpose)
 # The optional factory_* roles below specialize one phase; unset roles fall
 # back to the generic ones, so no merge is required for a working install.
 # modelRoles:              # uncomment and fill to specialize one phase
@@ -12,11 +12,7 @@
   #   factory_review: <a model family different from your default>
 
 task:
-  enableLsp: true            # factory-implementer/integrator list lsp; off by default for subagents
-  isolation:
-    enabled: true            # coordinator runs every packet isolated when all three are set
-    merge: patch             # required: patches apply to the working tree, nothing is committed before Gate 3
-    apply: true              # required: land isolated changes; otherwise the coordinator treats isolation as off
+  enableLsp: true            # factory-implementer lists lsp; off by default for subagents
   agentSoftRequestBudget:
     factory-implementer: 300
     factory-tester: 250

@@ -4,7 +4,6 @@
 - **Repo:** <root>
 - **Base:** <sha> on <branch>
 - **Run branch:** factory/<slug>
-- **Isolation:** on (patch, apply) | off
 - **Baseline:** <green | N failing> (reports/baseline.json)
 - **Freeze:** <sha> (reports/freeze.txt)
 - **Current generations:** plan.<N> · <P>.change.<N> · test.<N> · review.<N> · security.<N>
@@ -21,7 +20,6 @@
 | designs/<P>.<N>.json | factory-designer | DesignNote |
 | decisions.md | coordinator | Decision ledger |
 | reports/<P>.change.<N>.json | factory-implementer | ChangeReport |
-| reports/<P>.integration.<N>.json | factory-integrator | IntegrationReport |
 | reports/test.<N>.json | factory-tester | TestReport |
 | reports/review.<N>.json | factory-reviewer | ReviewReport |
 | reports/security.<N>.json | factory-security-reviewer | ReviewReport |

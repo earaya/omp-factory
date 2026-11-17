@@ -34,7 +34,7 @@ The collector matches run.md Log prose by pattern. Re-read every echoed `lines` 
 
 ## 2. Root-cause
 
-1. Read `skill://factory` and every agent the signals implicate (`factory-planner`, `factory-designer`, `factory-implementer`, `factory-integrator`, `factory-tester`, `factory-reviewer`, `factory-security-reviewer`). Read the target repo's `.omp/RULES.md`.
+1. Read `skill://factory` and every agent the signals implicate (`factory-planner`, `factory-designer`, `factory-implementer`, `factory-tester`, `factory-reviewer`, `factory-security-reviewer`). Read the target repo's `.omp/RULES.md`.
 2. For each nonzero signal, read the run artifacts behind it (`run.md`, `plan.<N>.json`, `plan.<N>.amendments.json`, `reports/*.json`, `decisions.md`) and find why it happened. A count is not a cause.
 3. Cite evidence on both sides: `path:line` in the run directory, and the `skill://factory`, agent, or `.omp/RULES.md` line the proposal would change. No citation on either side → no proposal.
 4. Decide the fix target:

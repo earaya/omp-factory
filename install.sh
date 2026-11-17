@@ -34,6 +34,6 @@ done
 cat <<EOF
 
 Optional: merge config/config.example.yml into $agent_dir/config.yml
-(model roles, isolation). Agents fall back to concrete models without it.
+(model roles). Agents fall back to @default/@advisor without it.
 EOF
 exit "$status"

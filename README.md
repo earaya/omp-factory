@@ -36,7 +36,7 @@ Subagents run headless and cannot ask you anything. Only the main session can ra
 | Level | Meaning | Parallel safety |
 |---|---|---|
 | `owns` | Only this packet edits it | Exclusive across all packets |
-| `shares` | Several packets change logic in it | With isolation, each packet's patch lands in turn and conflicts go to `factory-integrator`; without isolation, sharers are serialized |
+| `shares` | Several packets change logic in it | Sharers in one wave are serialized |
 | `requests` | Only an entry in a registry file (exports, routes, dependency lists) | The coordinator applies entries after the wave |
 
 Generated files (lockfiles, codegen) belong to no packet; the coordinator regenerates them. Shared types and signatures go in a wave-0 `contract` packet that others depend on. Large tasks run as **milestones**, each a full plan → review cycle with a gate where you can re-plan the rest.
@@ -52,15 +52,14 @@ Generated files (lockfiles, codegen) belong to no packet; the coordinator regene
 | `skills/factory-retro/SKILL.md` | Retro playbook: root-cause a finished run's friction signals against the factory and propose additions and deletions in one form |
 | `skills/factory-retro/scripts/factory-retro.sh` | Retro collector: `collect <run-dir>...` prints a run's friction signals (re-plans, amendments, schema failures, advisories, applied requests, deviations, fix loops, decisions) as JSON |
 | `hooks/pre/factory-guard.ts` | Blocks subagents from git history, branch, checkout/restore/reset and GitHub mutations; only the coordinator integrates |
-| `config/config.example.yml` | Optional model roles and isolation settings |
+| `config/config.example.yml` | Optional model roles |
 | `.omp/RULES.md` | Repo rules read by every agent, including subagents; Test: `bun test` |
 
 ## Prerequisites
 
 - [oh-my-pi](https://github.com/can1357/oh-my-pi) (`omp`) installed and configured with at least one model provider.
 - `git`. The coordinator creates a `factory/<slug>` branch in the target repo and refuses to start on a dirty working tree.
-- Models resolve from your OMP model roles: planner, designer, implementer, integrator and tester fall back to `@default`; both reviewers to `@advisor` (a different family on purpose). Optional `@factory_plan/impl/test/review` roles override a phase without code changes (see `config/config.example.yml`).
-- For parallel isolated packets: `task.isolation.enabled: true`, `merge: patch`, `apply: true`. Otherwise packets share one checkout and sharers are serialized.
+- Models resolve from your OMP model roles: planner, designer, implementer and tester fall back to `@default`; both reviewers to `@advisor` (a different family on purpose). Optional `@factory_plan/impl/test/review` roles override a phase without code changes (see `config/config.example.yml`).
 - [Bun](https://bun.sh), only for running this repo's tests.
 
 ## Install
