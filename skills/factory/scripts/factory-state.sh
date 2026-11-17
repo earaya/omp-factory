@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Coordinator state helper — disk-derivable factory-run facts only.
+# Coordinator state helper: disk-derived factory-run facts, so the playbook
+# never hand-runs or hand-transcribes these recipes.
 #
-# freeze/verify implement the skills/factory/SKILL.md §6 step-7 recipe verbatim
-# (porcelain v1 -z; an R/C entry consumes both NUL-delimited fields as one
-# entry; per-path `git hash-object`, `deleted` markers, `printf %q` path
-# escaping), so the Freeze sha is derived from the tree — never hand-
-# transcribed — and tree == freeze is one command.
+# A record line is one `git status --porcelain=v1 -z --untracked-files=all`
+# entry: `<XY>\t<path>\t<sha>` (`deleted` for deletions), plus `\t<orig>` for
+# R/C entries, whose second NUL field is consumed as part of the same entry.
+# Paths are `printf %q`-escaped so tabs/newlines keep the record parseable.
 #
-# Deliberately no `log` subcommand: a script cannot see tool-call results, so
-# spawn/persist/log ordering stays a coordinator rule ("Be transactional").
+# No `log` subcommand: a script cannot see tool-call results, so
+# spawn/persist/log ordering stays a coordinator rule.
 set -euo pipefail
 
 die() { echo "factory-state: $*" >&2; exit 2; }
 
 record() {
-	# The §6 step-7 recipe, run from the repo root.
+	# One record line per porcelain entry (see header); run from the repo root.
 	while IFS= read -r -d '' entry; do
 		local xy=${entry:0:2}
 		local path=${entry:3}
@@ -58,21 +58,54 @@ cmd_verify() {
 	exit 1
 }
 
-cmd_next() {
-	local dir=${1:?dir} prefix=${2:?prefix}
-	[[ -d $dir ]] || die "not a directory: $dir"
-	local max=0 n f
-	for f in "$dir/$prefix."*; do
-		if [[ ! -e $f ]]; then
-			continue
+cmd_snapshot() {
+	local run_dir=${1:?run-dir} wave=${2:?wave}
+	[[ -d $run_dir ]] || die "not a directory: $run_dir"
+	mkdir -p "$run_dir/reports"
+	record > "$run_dir/reports/status-wave-$wave.before"
+}
+
+# Escaped paths whose record line was added, removed, or changed since the
+# wave's snapshot: what the wave touched, earlier waves' edits excluded.
+cmd_changed() {
+	local run_dir=${1:?run-dir} wave=${2:?wave}
+	local before=$run_dir/reports/status-wave-$wave.before
+	[[ -f $before ]] || die "no snapshot: $before"
+	local a b
+	a=$(mktemp); b=$(mktemp)
+	trap "rm -f '$a' '$b'" EXIT
+	LC_ALL=C sort "$before" > "$a"
+	record | LC_ALL=C sort > "$b"
+	# comm prefixes second-column lines with a tab, shifting the path to field 3.
+	LC_ALL=C comm -3 "$a" "$b" | awk -F'\t' '{ print ($1 == "" ? $3 : $2) }' | LC_ALL=C sort -u
+}
+
+# Pre-review check: every freeze path (field 2; renamed-from is metadata) is
+# in `git diff --name-only <base>` or the untracked set, compared escaped;
+# a tracked entry needs a non-empty diff. Exit 1 lists each defect.
+cmd_coverage() {
+	local run_dir=${1:?run-dir} base=${2:?base}
+	local freeze=$run_dir/reports/freeze.txt
+	[[ -f $freeze ]] || die "no freeze record: $freeze"
+	local covered xy path rest ok=1 tracked=0
+	covered=$(mktemp)
+	trap "rm -f '$covered'" EXIT
+	{ git diff --name-only -z "$base"; git ls-files --others --exclude-standard -z; } |
+		while IFS= read -r -d '' path; do printf '%q\n' "$path"; done > "$covered"
+	while IFS=$'\t' read -r xy path rest; do
+		[[ -n $xy ]] || continue
+		[[ $xy == '??' ]] || tracked=1
+		if ! grep -Fxq -- "$path" "$covered"; then
+			echo "not covered: $path" >&2
+			ok=0
 		fi
-		n=${f#"$dir/$prefix".}
-		n=${n%%.*}
-		if [[ $n =~ ^[0-9]+$ ]] && (( n > max )); then
-			max=$n
-		fi
-	done
-	echo "$prefix.$(( max + 1 ))"
+	done < "$freeze"
+	if (( tracked )) && [[ -z $(git diff --stat "$base") ]]; then
+		echo "tracked entries in freeze but git diff --stat $base is empty" >&2
+		ok=0
+	fi
+	(( ok )) || exit 1
+	echo "coverage ok"
 }
 
 # Fix loops derive from the persisted reports' latest verdict: the phase's Nth
@@ -140,15 +173,19 @@ cmd_loops() {
 case ${1:-} in
 freeze) shift; cmd_freeze "$@" ;;
 verify) shift; cmd_verify "$@" ;;
-next) shift; cmd_next "$@" ;;
+snapshot) shift; cmd_snapshot "$@" ;;
+changed) shift; cmd_changed "$@" ;;
+coverage) shift; cmd_coverage "$@" ;;
 loops) shift; cmd_loops "$@" ;;
 *)
 	cat >&2 <<'EOF'
 usage: factory-state.sh <command>
-  freeze <run-dir>     write reports/freeze.txt per the §6 step-7 recipe, print its sha
-  verify <run-dir>     tree == freeze? exit 0 and print the sha, or exit 1 (stale)
-  next <dir> <prefix>  next generation name (e.g. next reports test -> test.3)
-  loops <run-dir> <test|review|security>  count persisted fix loops and report the §7/§8 ladder tier
+  freeze <run-dir>             write reports/freeze.txt, print its sha
+  verify <run-dir>             tree == freeze? exit 0, or exit 1 (stale)
+  snapshot <run-dir> <wave>    write reports/status-wave-<wave>.before
+  changed <run-dir> <wave>     print escaped paths the wave changed since its snapshot
+  coverage <run-dir> <base>    every freeze path is in the diff vs base? exit 0, or exit 1 listing defects
+  loops <run-dir> <test|review|security>  persisted fix-loop count and ladder tier
 EOF
 	exit 2
 	;;

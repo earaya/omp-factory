@@ -5,9 +5,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-// Covers scripts/factory-state.sh — the coordinator state helper. Disk-derivable
-// facts only (freeze/verify/next); the recipe it runs is the §6 step-7 one that
-// tests/factory-recipes.test.ts pins from the other side.
+// Covers scripts/factory-state.sh, the coordinator state helper. Fixtures are
+// mkdtemp repos with the run dir outside the repo, so the record never lists it.
 const SCRIPT = join(import.meta.dir, "..", "skills", "factory", "scripts", "factory-state.sh");
 
 // allowlist, never a process.env spread — host GIT_* would leak into fixtures
@@ -147,19 +146,103 @@ describe("factory-state.sh verify", () => {
 	});
 });
 
-describe("factory-state.sh next", () => {
-	test("derives the next generation from existing artifacts", () => {
-		const { root, run } = initRepo();
-		const reports = join(run, "reports");
-		mkdirSync(reports, { recursive: true });
-		expect(sh(root, "next", reports, "test")).toBe("test.1"); // empty dir
-		writeFileSync(join(reports, "test.1.json"), "{}");
-		writeFileSync(join(reports, "test.2.json"), "{}");
-		expect(sh(root, "next", reports, "test")).toBe("test.3");
-		expect(sh(root, "next", reports, "review")).toBe("review.1"); // other prefixes unaffected
-		writeFileSync(join(reports, "plan.1.json"), "{}");
-		writeFileSync(join(reports, "plan.1.md"), ""); // .md sibling of the same generation does not bump it
-		expect(sh(root, "next", reports, "plan")).toBe("plan.2");
+const gitIn = (root: string, repo: string, ...args: string[]) =>
+	execFileSync("git", args, { cwd: repo, env: fixtureEnv(root), encoding: "utf8" });
+
+// Runs the helper expecting it may fail; exit status and stderr instead of a throw.
+function attempt(root: string, ...args: string[]): { status: number; out: string; err: string } {
+	try {
+		return { status: 0, out: sh(root, ...args), err: "" };
+	} catch (e) {
+		// execFileSync throws an Error carrying the child's status and output.
+		const err = e as { status: number; stdout?: unknown; stderr?: unknown };
+		return { status: err.status, out: String(err.stdout ?? ""), err: String(err.stderr ?? "") };
+	}
+}
+
+describe("factory-state.sh snapshot / changed", () => {
+	test("changed lists only what the wave touched, escaped and sorted", () => {
+		const { root, repo, run } = initRepo({ "a.txt": "a\n", "b.txt": "b\n" });
+		writeFileSync(join(repo, "a.txt"), "a2\n"); // earlier wave's edit
+		sh(root, "snapshot", run, "1");
+		expect(readFileSync(join(run, "reports", "status-wave-1.before"), "utf8")).toContain("a.txt");
+		writeFileSync(join(repo, "b.txt"), "b2\n");
+		writeFileSync(join(repo, "n ew.txt"), "n\n");
+		expect(sh(root, "changed", run, "1").split("\n")).toEqual(["b.txt", "n\\ ew.txt"]);
+	});
+
+	test("a re-edit of an earlier wave's file counts; a removed entry counts", () => {
+		const { root, repo, run } = initRepo({ "a.txt": "a\n" });
+		writeFileSync(join(repo, "a.txt"), "a2\n");
+		writeFileSync(join(repo, "u.txt"), "u\n");
+		sh(root, "snapshot", run, "2");
+		writeFileSync(join(repo, "a.txt"), "a3\n");
+		rmSync(join(repo, "u.txt"));
+		expect(sh(root, "changed", run, "2").split("\n")).toEqual(["a.txt", "u.txt"]);
+	});
+
+	test("no change prints nothing; a missing snapshot exits 2", () => {
+		const { root, run } = initRepo({ "a.txt": "a\n" });
+		sh(root, "snapshot", run, "0");
+		expect(sh(root, "changed", run, "0")).toBe("");
+		const r = attempt(root, "changed", run, "9");
+		expect(r.status).toBe(2);
+		expect(r.err).toContain("no snapshot");
+	});
+});
+
+describe("factory-state.sh coverage", () => {
+	const base = (root: string, repo: string) => gitIn(root, repo, "rev-parse", "HEAD").trim();
+	const writeFreeze = (run: string, lines: string[]) => {
+		mkdirSync(join(run, "reports"), { recursive: true });
+		writeFileSync(join(run, "reports", "freeze.txt"), lines.map(l => `${l}\n`).join(""));
+	};
+
+	test("rename, modification, and untracked file are covered; renamed-from is metadata", () => {
+		const { root, repo, run } = initRepo({ "old.txt": "o\n", "keep.txt": "k\n" });
+		gitIn(root, repo, "mv", "old.txt", "new name.txt");
+		writeFileSync(join(repo, "keep.txt"), "k2\n");
+		writeFileSync(join(repo, "copy.txt"), "c\n");
+		sh(root, "freeze", run);
+		expect(sh(root, "coverage", run, base(root, repo))).toBe("coverage ok");
+		// A C line whose field 4 names a path in neither set still passes: only field 2 counts.
+		writeFreeze(run, [["C ", "copy.txt", blobSha("c\n"), "ghost-orig.txt"].join("\t")]);
+		expect(attempt(root, "coverage", run, base(root, repo)).status).toBe(0);
+	});
+
+	test("a freeze path missing from both sets fails, including a gitignored file", () => {
+		const { root, repo, run } = initRepo({ "keep.txt": "k\n" });
+		writeFileSync(join(repo, ".gitignore"), "ignored.log\n");
+		writeFileSync(join(repo, "ignored.log"), "l\n");
+		writeFreeze(run, [
+			["??", "ghost.txt", blobSha("x\n")].join("\t"),
+			["??", "ignored.log", blobSha("l\n")].join("\t"),
+			["??", ".gitignore", blobSha("ignored.log\n")].join("\t"),
+		]);
+		const r = attempt(root, "coverage", run, base(root, repo));
+		expect(r.status).toBe(1);
+		expect(r.err).toContain("not covered: ghost.txt");
+		expect(r.err).toContain("not covered: ignored.log");
+		expect(r.err).not.toContain(".gitignore");
+	});
+
+	test("a tracked entry against an empty diff fails; an untracked-only freeze passes", () => {
+		const { root, repo, run } = initRepo({ "keep.txt": "k\n" });
+		writeFileSync(join(repo, "u sp.txt"), "u\n");
+		sh(root, "freeze", run);
+		expect(attempt(root, "coverage", run, base(root, repo)).status).toBe(0);
+		writeFreeze(run, [["M ", "keep.txt", blobSha("k\n")].join("\t")]);
+		const r = attempt(root, "coverage", run, base(root, repo));
+		expect(r.status).toBe(1);
+		expect(r.err).toContain("is empty");
+	});
+
+	test("paths compare escaped on both sides", () => {
+		const { root, repo, run } = initRepo({ "dir sp/file sp.txt": "v1\n" });
+		writeFileSync(join(repo, "dir sp", "file sp.txt"), "v2\n");
+		sh(root, "freeze", run);
+		expect(freezeLines(run)[0].split("\t")[1]).toBe("dir\\ sp/file\\ sp.txt");
+		expect(sh(root, "coverage", run, base(root, repo))).toBe("coverage ok");
 	});
 });
 
