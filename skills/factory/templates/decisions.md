@@ -12,6 +12,6 @@ One entry per decision. Never delete entries; supersede them. Every agent receiv
   - `<id>`: <tradeoff>
 - **Recommendation:** `<id>`
 - **Evidence:** `path:line`
-- **Decision:** `<id>`
-- **Decided by:** user | auto-adopted (implementation kind only)
+- **Decision:** `<id>` | open (decided at <gate or run>; keep a Recommendation) | `<id>`, superseded by D<n>
+- **Decided by:** user | auto-adopted (implementation kind only) | — while open
 - **Notes:** <user's comments, or why it was superseded>

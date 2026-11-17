@@ -50,6 +50,27 @@ describe("factory-spec.ts check", () => {
 		expect(spawnSync(SCRIPT, [], { encoding: "utf8" }).stderr).toContain("usage: factory-spec.ts");
 	});
 
+	test("an Acceptance asserting a value an open decision still owns fails", () => {
+		const files = {
+			...good,
+			"decisions.md": ledger(
+				entry("D1", "`a`"),
+				entry("D2", "open", "- **Recommendation:** header `customer`; `{rightType: IP_ALLOWLIST}`\n"),
+				entry("D3", "`b`"),
+			),
+			"roadmap.md": `${run("R1")}${run("R2", "- **Goal:** g\n- **Scope:** s, per `IP_ALLOWLIST`\n- **Acceptance:** header `customer` set, type IP_ALLOWLIST, customer id present\n")}`,
+		};
+		const r = check(files);
+		expect(r.status).toBe(1);
+		expect(r.stderr).toContain("R2: Acceptance asserts `customer`, which open D2 still decides"); // backticked
+		expect(r.stderr).toContain("R2: Acceptance asserts `IP_ALLOWLIST`, which open D2 still decides"); // bare ALL_CAPS inside a long span
+		files["roadmap.md"] = `${run("R1")}${run("R2", "- **Goal:** g\n- **Scope:** per `IP_ALLOWLIST`\n- **Acceptance:** the shape D2 decides; customer id present\n")}`;
+		expect(check(files).status).toBe(0); // Scope may name it; a plain word is not a hit
+		files["roadmap.md"] = `${run("R1")}${run("R2", "- **Goal:** g\n- **Scope:** s\n- **Acceptance:** header `customer` set\n")}`;
+		files["decisions.md"] = ledger(entry("D1", "`a`"), entry("D2", "`header`", "- **Recommendation:** header `customer`\n"), entry("D3", "`b`"));
+		expect(check(files).status).toBe(0); // decided: asserting it is fine
+	});
+
 	test("ledger defects: no Kind, no Decision, open without Recommendation, unknown successor", () => {
 		const r = check({
 			...good,

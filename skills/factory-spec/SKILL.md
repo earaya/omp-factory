@@ -53,7 +53,7 @@ Rules for the roadmap:
 
 ## 4. Check
 
-1. `factory-spec check <spec-dir>` must exit 0. It verifies structure: the three files exist; every ledger entry has `Kind` and `Decision`; open entries have a `Recommendation`; every `D<n>` and `R<n>` cited exists; every run has Goal, Scope, and Acceptance. Exit 1 lists defects; fix them and rerun.
+1. `factory-spec check <spec-dir>` must exit 0. It verifies structure: the three files exist; every ledger entry has `Kind` and `Decision`; open entries have a `Recommendation`; every `D<n>` and `R<n>` cited exists; every run has Goal, Scope, and Acceptance; and no Acceptance contains a backticked value from an open decision's Recommendation (write "the contract D<n> decides" instead). Exit 1 lists defects; fix them and rerun.
 2. Judgment checks the script cannot do: re-read each Brief against its scope (rule 1 above), and remove text left over from superseded decisions.
 3. Spawn `factory-reviewer` (a different model family) with the spec directory as the "diff", the interview answers, and this instruction: review the spec for contradictions between files, acceptance criteria outside their run's scope, underspecified cross-system contracts, and decisions recorded from defaults. Fix blockers and majors; route its `decisions[]` to the user.
 

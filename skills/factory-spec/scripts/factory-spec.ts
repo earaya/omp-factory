@@ -76,10 +76,31 @@ for (const d of decisions) {
 	if (successor && !decisionIds.has(successor)) defects.push(`decisions.md ${d.id}: superseded by unknown ${successor}`);
 }
 
+// A run's Acceptance must not assert a value an open decision still owns. Reserved
+// tokens are the identifiers inside backticked spans of an open decision's
+// Recommendation (`{rightType: IP_ALLOWLIST}` yields rightType and IP_ALLOWLIST).
+const reserved = decisions.flatMap(d =>
+	open.includes(d.id)
+		? [...(field(d.body, "Recommendation") ?? "").matchAll(/`([^`]+)`/g)].flatMap(m =>
+				(m[1].match(/[A-Za-z_][\w.]*\w/g) ?? []).map(token => ({ id: d.id, token })),
+			)
+		: [],
+);
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Backticked anywhere; bare only when unambiguous (ALL_CAPS or a dotted field), so
+// a plain word like customer in "customer id" is not a hit.
+const asserts = (text: string, token: string) =>
+	text.includes(`\`${token}\``) ||
+	((/^[A-Z][A-Z0-9_]+$/.test(token) || token.includes(".")) && new RegExp(`(^|[^\\w.])${escape(token)}($|[^\\w.])`).test(text));
+
 if (runs.length === 0) defects.push("roadmap.md: no `## R<n>:` runs");
 for (const r of runs) {
 	for (const name of ["Goal", "Scope", "Acceptance"]) {
 		if (field(r.body, name) === undefined) defects.push(`roadmap.md ${r.id}: no ${name}`);
+	}
+	const acceptance = /^- \*\*Acceptance[^*]*:\*\*([\s\S]*?)(?=^- \*\*|(?![\s\S]))/m.exec(r.body)?.[1] ?? "";
+	for (const { id, token } of reserved) {
+		if (asserts(acceptance, token)) defects.push(`roadmap.md ${r.id}: Acceptance asserts \`${token}\`, which open ${id} still decides`);
 	}
 }
 
