@@ -49,6 +49,8 @@ Generated files (lockfiles, codegen) belong to no packet; the coordinator regene
 | `skills/factory/SKILL.md` | Coordinator playbook: triage, baseline, gates, waves, fix loops, review rounds, milestones, integration, with a verification check after each phase |
 | `skills/factory/templates/` | Brief, decision ledger, run state, per-repo `RULES.md` |
 | `skills/factory/scripts/factory-state.sh` | Coordinator state helper: freeze record + sha (`freeze`), tree==freeze check (`verify`), persisted fix-loop count and ladder tier (`loops test|review|security`) |
+| `skills/factory-retro/SKILL.md` | Retro playbook: root-cause a finished run's friction signals against the factory and propose additions and deletions in one form |
+| `skills/factory-retro/scripts/factory-retro.sh` | Retro collector: `collect <run-dir>...` prints a run's friction signals (re-plans, amendments, schema failures, advisories, applied requests, deviations, fix loops, decisions) as JSON |
 | `hooks/pre/factory-guard.ts` | Blocks subagents from git history, branch, checkout/restore/reset and GitHub mutations; only the coordinator integrates |
 | `config/config.example.yml` | Optional model roles and isolation settings |
 | `.omp/RULES.md` | Repo rules read by every agent, including subagents; Test: `bun test` |
@@ -67,7 +69,7 @@ Generated files (lockfiles, codegen) belong to no packet; the coordinator regene
 ./install.sh
 ```
 
-The script symlinks the agents, the skill and the hook into `~/.omp/agent/`, which makes them available in every repo. Edits in this repo take effect in new sessions and in agents spawned mid-run. To run the factory while editing it, install from a separate worktree: `git worktree add ../omp-factory-stable main && ../omp-factory-stable/install.sh`. The script is safe to re-run, and it never overwrites a real file.
+The script symlinks the agents, the skills and the hook into `~/.omp/agent/`, which makes them available in every repo. Edits in this repo take effect in new sessions and in agents spawned mid-run. To run the factory while editing it, install from a separate worktree: `git worktree add ../omp-factory-stable main && ../omp-factory-stable/install.sh`. The script is safe to re-run, and it never overwrites a real file.
 
 Optionally, merge `config/config.example.yml` into `~/.omp/agent/config.yml`.
 
@@ -81,9 +83,12 @@ To specialize a role for one repo, add `.omp/agents/factory-tester.md` (or anoth
 
 ```
 /skill:factory Add rate limiting to the public API
+/skill:factory-retro <run-dir>...
 ```
 
 Each run's artifacts go in `.factory/runs/<slug>/` inside the target repo. The coordinator adds `.factory/` to `.git/info/exclude`, so the run directory stays untracked without editing `.gitignore`. Watch and steer workers live from Agent Hub (`Alt+A`).
+
+After a run, `/skill:factory-retro` turns one or more run directories into proposed changes to this factory or to the target repo's `.omp/RULES.md`. Nothing is edited until you accept a proposal.
 
 ## Gates
 
@@ -108,4 +113,4 @@ Each run's artifacts go in `.factory/runs/<slug>/` inside the target repo. The c
 bun test
 ```
 
-Without a standalone Bun, omp's embedded one works: `BUN_BE_BUN=1 "$(realpath "$(which omp)")" test`. Tests cover the guard patterns, the state helper and recipes, and keep the copied `decisions[]` and ReviewReport schemas identical across agents (omp has no schema `$ref`).
+Without a standalone Bun, omp's embedded one works: `BUN_BE_BUN=1 "$(realpath "$(which omp)")" test`. Tests cover the guard patterns, the state helper and recipes, the retro collector, and keep the copied `decisions[]` and ReviewReport schemas identical across agents (omp has no schema `$ref`).
