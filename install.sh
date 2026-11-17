@@ -27,6 +27,7 @@ for f in "$repo"/agents/*.md; do
 done
 link "$repo/skills/factory" "$agent_dir/skills/factory"
 link "$repo/skills/factory-retro" "$agent_dir/skills/factory-retro"
+link "$repo/skills/factory-spec" "$agent_dir/skills/factory-spec"
 for f in "$repo"/hooks/pre/*.ts; do
 	link "$f" "$agent_dir/hooks/pre/$(basename "$f")"
 done

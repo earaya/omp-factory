@@ -51,6 +51,8 @@ Generated files (lockfiles, codegen) belong to no packet; the coordinator regene
 | `skills/factory/scripts/factory-state.ts` | Coordinator state helper: `freeze`, `verify` (tree == freeze), `snapshot`/`changed` (paths a wave touched), `coverage` (pre-review diff check), `loops test\|review\|security` (fix-loop count and ladder tier) |
 | `skills/factory-retro/SKILL.md` | Retro playbook: root-cause a finished run's friction signals against the factory and propose additions and deletions in one form |
 | `skills/factory-retro/scripts/factory-retro.ts` | Retro collector: `collect <run-dir>...` prints a run's friction signals (re-plans, amendments, schema failures, advisories, applied requests, deviations, fix loops, decisions) as JSON |
+| `skills/factory-spec/SKILL.md` | Spec playbook: read the code first, interview in batched rounds, write `spec.md`, a decision ledger and a roadmap of factory-run Briefs, check, review, hand off |
+| `skills/factory-spec/scripts/factory-spec.ts` | Spec check: `check <spec-dir>` verifies the three files, ledger entries, cited decision and run ids, and each run's Goal/Scope/Acceptance |
 | `hooks/pre/factory-guard.ts` | Blocks subagents from git history, branch, checkout/restore/reset and GitHub mutations; only the coordinator integrates |
 | `config/config.example.yml` | Optional model roles |
 | `.omp/RULES.md` | Repo rules read by every agent, including subagents; Test: `bun test` |
@@ -81,6 +83,7 @@ To specialize a role for one repo, add `.omp/agents/factory-tester.md` (or anoth
 ## Use
 
 ```
+/skill:factory-spec Move every cache family from memcached to Redis
 /skill:factory Add rate limiting to the public API
 /skill:factory-retro <run-dir>...
 ```
@@ -88,6 +91,8 @@ To specialize a role for one repo, add `.omp/agents/factory-tester.md` (or anoth
 Each run's artifacts go in `.factory/runs/<slug>/` inside the target repo. The coordinator adds `.factory/` to `.git/info/exclude`, so the run directory stays untracked without editing `.gitignore`. Watch and steer workers live from Agent Hub (`Alt+A`).
 
 After a run, `/skill:factory-retro` turns one or more run directories into proposed changes to this factory or to the target repo's `.omp/RULES.md`. Nothing is edited until you accept a proposal.
+
+For a change too large or vague for one run, start with `/skill:factory-spec`. It writes `docs/specs/<YYYYMMDD-slug>/` in the target repo (spec, decision ledger, roadmap), and each roadmap item becomes one `/skill:factory` run that imports the ledger's decisions as closed.
 
 ## Gates
 
