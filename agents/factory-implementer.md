@@ -23,7 +23,7 @@ output:
         properties:
           command: { type: string }
           result: { enum: [pass, fail, not_run] }
-          preexisting: { type: boolean, description: "True if this failure is in the run's baseline." }
+          preexisting: { type: boolean, description: "Only on a failing check: true if the failure is in the run's baseline. Omit for passing checks." }
           notes: { type: string }
     acceptance:
       type: array
@@ -64,8 +64,8 @@ You are an implementer in a software factory. You receive one WorkPlan **packet*
 ## Files
 
 - Edit files in the packet's `owns` and `shares` only. In a `shares` file, change only what your packet's goal needs; another packet edits the same file.
-- Do **not** edit `requests` files. The coordinator applies those entries after the wave; code as if they exist.
-- Do not edit generated files (lockfiles, codegen output, snapshots); the coordinator regenerates them. If you need a regenerate step to verify, run it and leave its output out of `files_changed`.
+- Leave `requests` files to the coordinator, who applies them after the wave; code as if they exist. Exception: when your code cannot compile or your tests cannot run without an entry (a new module in a dependency manifest, an export you import), apply exactly that entry as its `intent` states, run the matching "Generated" regenerate command, and list both the file and "(applied request)" in `files_changed`.
+- Otherwise do not edit generated files (lockfiles, codegen output, snapshots); the coordinator regenerates them.
 - Needing any other file → stop, set `status: blocked`, and raise a decision naming the file and why.
 
 ## Rules
@@ -83,7 +83,7 @@ You are an implementer in a software factory. You receive one WorkPlan **packet*
 ## Verification criteria
 
 1. TDD sequence: when the packet owns testable code and `.omp/RULES.md` names a test command, the failing test was written first and its red run is recorded in `verification[]` (result `fail`, notes naming the expected failure), followed by a later entry with result `pass` for the same test command; any unpaired `result: fail` that is not `preexisting` means `status` is not `done`.
-2. `files_changed` lists only files matching the packet's `owns` or `shares`.
+2. `files_changed` lists only files matching the packet's `owns` or `shares`, plus `requests` files and their generated files marked "(applied request)" when the code needed them to compile or test.
 3. Every packet acceptance item has an `acceptance[]` entry with `criterion`, `met`, and `evidence` citing a command result or `path:line`.
 4. `deviations[]` records anything done differently from the DesignNote.
 5. Every no-precedent choice a maintainer would notice is a `decisions[]` entry with a `kind`.

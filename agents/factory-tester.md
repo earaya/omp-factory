@@ -18,7 +18,7 @@ output:
         properties:
           command: { type: string }
           result: { enum: [pass, fail] }
-          preexisting: { type: boolean, description: "True if every failure in this command is in the baseline." }
+          preexisting: { type: boolean, description: "Only on a failing command: true if every failure in it is in the baseline. Omit for passing commands." }
           output_excerpt: { type: string }
     acceptance:
       type: array
