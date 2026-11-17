@@ -80,13 +80,13 @@ cmd_next() {
 # "changes_requested"), so failing count = pending loop; a passing latest
 # report closes the phase. Disk-derived, never hand-counted.
 cmd_loops() {
-	local run_dir=${1:?run-dir} phase=${2:?test|review}
+	local run_dir=${1:?run-dir} phase=${2:?test|review|security}
 	local reports=$run_dir/reports
 	local bad
 	case $phase in
 		test) bad='fail' ;;
-		review) bad='changes_requested' ;;
-		*) die "phase must be test or review" ;;
+		review|security) bad='changes_requested' ;;
+		*) die "phase must be test, review, or security" ;;
 	esac
 	if [[ ! -d $reports ]]; then
 		echo "$phase fix loops: 0 completed, no pending attempt — autonomous (loops 1-3)"
@@ -148,7 +148,7 @@ usage: factory-state.sh <command>
   freeze <run-dir>     write reports/freeze.txt per the §6 step-7 recipe, print its sha
   verify <run-dir>     tree == freeze? exit 0 and print the sha, or exit 1 (stale)
   next <dir> <prefix>  next generation name (e.g. next reports test -> test.3)
-  loops <run-dir> <test|review>  count persisted fix loops and report the §7/§8 ladder tier
+  loops <run-dir> <test|review|security>  count persisted fix loops and report the §7/§8 ladder tier
 EOF
 	exit 2
 	;;

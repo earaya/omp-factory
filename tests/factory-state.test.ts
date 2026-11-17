@@ -223,6 +223,15 @@ describe("factory-state.sh loops", () => {
 		expect(sh(root, "loops", run, "review")).toBe(loops("review", 1, null, ""));
 	});
 
+	test("security counts its own reports, independent of review", () => {
+		const { root, run } = initRepo();
+		report(run, "review.1.json", "approve");
+		report(run, "security.1.json", "changes_requested");
+		report(run, "security.2.json", "changes_requested");
+		expect(sh(root, "loops", run, "security")).toBe(loops("security", 1, 2, "autonomous (loops 1-3)"));
+		expect(sh(root, "loops", run, "review")).toBe(loops("review", 0, null, ""));
+	});
+
 	test("three fails: pending loop 3 still autonomous", () => {
 		const { root, run } = initRepo();
 		for (let n = 1; n <= 3; n++) report(run, `test.${n}.json`, "fail");
@@ -251,6 +260,6 @@ describe("factory-state.sh loops", () => {
 
 	test("rejects a bad phase", () => {
 		const { root, run } = initRepo();
-		expect(() => sh(root, "loops", run, "plan")).toThrow(/test or review/);
+		expect(() => sh(root, "loops", run, "plan")).toThrow(/test, review, or security/);
 	});
 });

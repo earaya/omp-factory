@@ -1,14 +1,20 @@
 import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 
-// Subagents must never change git history or remote state: the coordinator
-// (main session) integrates at Gate 3. This is an approval guard, not a
-// sandbox: it does not parse shell syntax and does not see eval subprocesses.
+// Subagents must never change git history, branches, remote state, or discard
+// working-tree changes: the coordinator (main session) integrates. This is an
+// approval guard, not a sandbox: it does not parse shell syntax and does not
+// see eval subprocesses.
+
+// `git` followed by any global options: -C <dir>, -c <k=v>, --no-pager, --git-dir=...
+const GIT = String.raw`\bgit\s+(?:(?:-[Cc]\s+\S+|--[\w-]+(?:=\S+)?)\s+)*`;
+
 const BLOCKED: ReadonlyArray<readonly [RegExp, string]> = [
-	[/\bgit\s+(?:-C\s+\S+\s+)?(commit|push|merge|rebase|cherry-pick|revert|tag|am)\b/, "git history/remote change"],
-	[/\bgit\s+(?:-C\s+\S+\s+)?reset\s+--hard\b/, "git reset --hard"],
-	[/\bgit\s+(?:-C\s+\S+\s+)?(switch|checkout)\s+(-[bBcC]\b|--orphan\b)/, "branch creation"],
-	[/\bgit\s+(?:-C\s+\S+\s+)?branch\s+(-[dDmMfc]\b|--delete\b|--force\b)/, "branch rewrite"],
-	[/\bgit\s+(?:-C\s+\S+\s+)?(clean\s+-\w*f|stash\b)/, "discarding working-tree state"],
+	[new RegExp(`${GIT}(commit|push|merge|rebase|cherry-pick|revert|tag|am|pull)\\b`), "git history/remote change"],
+	[new RegExp(`${GIT}reset\\b`), "git reset"],
+	[new RegExp(`${GIT}(checkout|switch)\\b`), "branch or working-tree checkout"],
+	[new RegExp(`${GIT}restore\\b`), "discarding working-tree state"],
+	[new RegExp(`${GIT}branch\\s+(-[dDmMfcC]\\b|--delete\\b|--force\\b|--move\\b|--copy\\b)`), "branch rewrite"],
+	[new RegExp(`${GIT}(clean\\s+-\\w*f|stash\\b)`), "discarding working-tree state"],
 	[/\bgh\s+(pr|release|repo)\s+(create|merge|close|edit|delete)\b/, "GitHub mutation"],
 ];
 

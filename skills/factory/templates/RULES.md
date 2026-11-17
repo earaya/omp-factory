@@ -9,9 +9,15 @@
 - Test (all): `<cmd>`
 - Test (one file): `<cmd> <path>`
 
+## Generated
+
+Files no packet edits; the coordinator regenerates them after each wave.
+
+- `<path or glob>`: `<regenerate command>` (e.g. `go.sum`: `go mod tidy`)
+
 ## Never touch
 
-- <generated files, vendored code, lockfiles unless required>
+- <vendored code, files that must not change>
 
 ## Conventions
 
