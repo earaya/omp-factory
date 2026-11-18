@@ -306,15 +306,6 @@ describe("factory-state.ts loops", () => {
 		expect(sh(root, "loops", run, "review")).toBe(loops("review", 1, null, ""));
 	});
 
-	test("security counts its own reports, independent of review", () => {
-		const { root, run } = initRepo();
-		report(run, "review.1.json", "approve");
-		report(run, "security.1.json", "changes_requested");
-		report(run, "security.2.json", "changes_requested");
-		expect(sh(root, "loops", run, "security")).toBe(loops("security", 1, 2, "autonomous (loops 1-3)"));
-		expect(sh(root, "loops", run, "review")).toBe(loops("review", 0, null, ""));
-	});
-
 	test("three fails: pending loop 3 still autonomous", () => {
 		const { root, run } = initRepo();
 		for (let n = 1; n <= 3; n++) report(run, `test.${n}.json`, "fail");
@@ -329,20 +320,253 @@ describe("factory-state.ts loops", () => {
 		expect(sh(root, "loops", run, "test")).toBe(loops("test", 0, 1, "autonomous (loops 1-3)"));
 	});
 
-	test("four fails: pending loop 4 needs coordinator approval", () => {
+	test("four fails: pending loop 4 asks the user", () => {
 		const { root, run } = initRepo();
 		for (let n = 1; n <= 4; n++) report(run, `test.${n}.json`, "fail");
-		expect(sh(root, "loops", run, "test")).toBe(loops("test", 3, 4, "coordinator-approved (loops 4-5)"));
+		expect(sh(root, "loops", run, "test")).toBe(loops("test", 3, 4, "ask the user (loop 4 > 3)"));
 	});
 
-	test("six fails: pending loop 6 asks the user", () => {
+	test("rejects a bad phase, including the retired security phase", () => {
 		const { root, run } = initRepo();
-		for (let n = 1; n <= 6; n++) report(run, `test.${n}.json`, "fail");
-		expect(sh(root, "loops", run, "test")).toBe(loops("test", 5, 6, "user approval (6th attempt)"));
+		for (const phase of ["plan", "security", "toString"]) {
+			const r = attempt(root, "loops", run, phase);
+			expect(r.status).toBe(2);
+			expect(r.err).toContain("phase must be test or review");
+		}
+	});
+});
+
+type PacketSpec = { id: string; owns?: string[]; shares?: string[]; requests?: string[]; reads?: string[]; depends_on?: string[]; contract?: boolean };
+
+// Writes a WorkPlan with the full packet shape; `requests` takes bare file names.
+function writePlan(dir: string, name: string, packets: PacketSpec[]): string {
+	const path = join(dir, name);
+	const plan = {
+		summary: "s",
+		packets: packets.map(p => ({
+			id: p.id,
+			title: p.id,
+			goal: "g",
+			owns: p.owns ?? [],
+			shares: p.shares ?? [],
+			requests: (p.requests ?? []).map(file => ({ file, intent: "i" })),
+			reads: p.reads ?? [],
+			depends_on: p.depends_on ?? [],
+			acceptance: ["a"],
+			risk: "low",
+			needs_design: false,
+			contract: p.contract ?? false,
+			security_sensitive: false,
+		})),
+		decisions: [],
+	};
+	writeFileSync(path, JSON.stringify(plan));
+	return path;
+}
+
+const RULES = [
+	"# Repo rules",
+	"",
+	"## Generated",
+	"",
+	"Files no packet edits.",
+	"",
+	"- `go.mod`, `go.sum`: `go mod tidy` (list it in `requests`)",
+	"- `**/build/**`: produced by gradle",
+	"",
+	"## Never touch",
+	"",
+	"- `vendor/x.go`: not generated, a later heading",
+	"",
+].join("\n");
+
+function withRules(repo: string): void {
+	mkdirSync(join(repo, ".omp"), { recursive: true });
+	writeFileSync(join(repo, ".omp", "RULES.md"), RULES);
+}
+
+describe("factory-state.ts validate", () => {
+	test("ok: Generated path in requests allowed; transitive contract dependency accepted", () => {
+		const { root, repo, run } = initRepo();
+		withRules(repo);
+		const plan = writePlan(run, "plan.1.json", [
+			{ id: "P1", owns: ["api.go"], reads: ["api.go"], contract: true },
+			{ id: "P2", owns: ["b.go", "vendor/x.go"], requests: ["go.mod", "go.sum"], depends_on: ["P1"] },
+			{ id: "P3", owns: ["c.go"], reads: ["api.go", "b.go"], depends_on: ["P2"] },
+		]);
+		expect(sh(root, "validate", plan)).toBe("plan ok: 3 packets");
 	});
 
-	test("rejects a bad phase", () => {
+	test("a plan without shares and no RULES.md is ok", () => {
 		const { root, run } = initRepo();
-		expect(() => sh(root, "loops", run, "plan")).toThrow(/test, review, or security/);
+		const path = join(run, "plan.1.json");
+		writeFileSync(path, JSON.stringify({ summary: "s", packets: [{ id: "P1", owns: ["go.mod"], depends_on: [] }], decisions: [] }));
+		expect(sh(root, "validate", path)).toBe("plan ok: 1 packets");
+	});
+
+	test("ownership defects are all collected", () => {
+		const { root, repo, run } = initRepo();
+		withRules(repo);
+		const plan = writePlan(run, "plan.1.json", [
+			{ id: "P1", owns: ["a.go", "s.go", "r.go"] },
+			{ id: "P1", owns: ["x.go"] },
+			{ id: "P2", owns: ["a.go", "app/build/out.jar"], shares: ["s.go", "go.sum"], requests: ["r.go"] },
+			{ id: "P3", owns: ["go.mod"] },
+		]);
+		const r = attempt(root, "validate", plan);
+		expect(r.status).toBe(1);
+		expect(r.out).toBe("");
+		expect(r.err.split("\n").filter(l => l !== "").sort()).toEqual(
+			[
+				"duplicate packet id: P1",
+				"a.go: owned by P1 and P2",
+				"s.go: owned by P1 and shared by P2",
+				"r.go: owned by P1 and requested by P2",
+				"app/build/out.jar: P2 owns a Generated path (**/build/**); list it in requests",
+				"go.sum: P2 shares a Generated path (go.sum); list it in requests",
+				"go.mod: P3 owns a Generated path (go.mod); list it in requests",
+			].sort(),
+		);
+	});
+
+	test("dependency and contract defects are all collected", () => {
+		const { root, run } = initRepo();
+		const plan = writePlan(run, "plan.1.json", [
+			{ id: "P1", owns: ["api.go"], contract: true, depends_on: ["P4"] },
+			{ id: "P2", owns: ["b.go"], depends_on: ["P3"] },
+			{ id: "P3", owns: ["c.go"], depends_on: ["P2", "P9"] },
+			{ id: "P4", owns: ["d.go"], depends_on: ["P4"] },
+			{ id: "P5", owns: ["e.go"], reads: ["api.go"] },
+		]);
+		const r = attempt(root, "validate", plan);
+		expect(r.status).toBe(1);
+		expect(r.err.split("\n").filter(l => l !== "").sort()).toEqual(
+			[
+				"P3 depends_on unknown id P9",
+				"P4 depends_on itself",
+				"dependency cycle: P2 -> P3 -> P2",
+				"contract packet P1 has depends_on: P4",
+				"P5 reads api.go owned by contract packet P1 without depending on it",
+			].sort(),
+		);
+	});
+
+	test("missing file, invalid JSON, or no packets array exits 2", () => {
+		const { root, run } = initRepo();
+		expect(attempt(root, "validate", join(run, "plan.9.json")).status).toBe(2);
+		writeFileSync(join(run, "bad.json"), "{nope");
+		const bad = attempt(root, "validate", join(run, "bad.json"));
+		expect(bad.status).toBe(2);
+		expect(bad.err).toContain("bad.json is not valid JSON");
+		writeFileSync(join(run, "empty.json"), `{"summary": "s"}`);
+		const empty = attempt(root, "validate", join(run, "empty.json"));
+		expect(empty.status).toBe(2);
+		expect(empty.err).toContain("no packets array");
+	});
+});
+
+describe("factory-state.ts waves", () => {
+	test("layers by dependency depth", () => {
+		const { root, run } = initRepo();
+		const plan = writePlan(run, "plan.1.json", [
+			{ id: "P1", owns: ["a"] },
+			{ id: "P2", owns: ["b"], depends_on: ["P1"] },
+			{ id: "P3", owns: ["c"] },
+			{ id: "P4", owns: ["d"], depends_on: ["P2", "P3"] },
+		]);
+		expect(sh(root, "waves", plan).split("\n")).toEqual(["wave 0: P1 P3", "wave 1: P2", "wave 2: P4"]);
+	});
+
+	test("same-file requests move the higher numeric id down; dependents follow", () => {
+		const { root, run } = initRepo();
+		const plan = writePlan(run, "plan.1.json", [
+			{ id: "P10", owns: ["c"], requests: ["go.mod"] },
+			{ id: "P11", owns: ["d"], depends_on: ["P10"] },
+			{ id: "P9", owns: ["b"], requests: ["go.mod"] },
+			{ id: "P1", owns: ["a"], shares: ["x"] },
+			{ id: "P2", owns: ["e"], shares: ["x"] },
+			{ id: "P3", owns: ["f"], shares: ["x"] },
+		]);
+		expect(sh(root, "waves", plan).split("\n")).toEqual([
+			"wave 0: P1 P9",
+			"wave 1: P2 P10",
+			"wave 2: P3 P11",
+		]);
+	});
+
+	test("a dependency cycle or unknown id exits 1 naming it", () => {
+		const { root, run } = initRepo();
+		const plan = writePlan(run, "plan.1.json", [
+			{ id: "P1", owns: ["a"], depends_on: ["P2"] },
+			{ id: "P2", owns: ["b"], depends_on: ["P1", "P7"] },
+		]);
+		const r = attempt(root, "waves", plan);
+		expect(r.status).toBe(1);
+		expect(r.err).toContain("dependency cycle: P1 -> P2 -> P1");
+		expect(r.err).toContain("P2 depends_on unknown id P7");
+	});
+});
+
+describe("factory-state.ts status", () => {
+	const put = (run: string, name: string, content: string) => {
+		mkdirSync(dirname(join(run, name)), { recursive: true });
+		writeFileSync(join(run, name), content);
+	};
+
+	test("empty run dir: every key reports none", () => {
+		const { root, run } = initRepo();
+		expect(sh(root, "status", run).split("\n")).toEqual([
+			"plan: none",
+			"designs: none",
+			"changes: none",
+			"test: none",
+			"review: none",
+			"loops: test 0 · review 0",
+			"freeze: none",
+			"tree: no freeze",
+		]);
+	});
+
+	test("derives latest generations, verdicts, loops, and freeze state; sidecars ignored", () => {
+		const { root, repo, run } = initRepo({ "a.txt": "a\n" });
+		writePlan(run, "plan.1.json", [{ id: "P1" }]);
+		writePlan(run, "plan.2.json", [{ id: "P1" }, { id: "P2" }]);
+		put(run, "plan.2.amendments.json", "{}");
+		put(run, "designs/P2.1.json", "{}");
+		put(run, "designs/P2.2.json", "{}");
+		put(run, "designs/P10.1.json", "{}");
+		put(run, "reports/P1.change.1.json", "{}");
+		put(run, "reports/P1.change.2.json", "{}");
+		put(run, "reports/P2.change.1.json", "{}");
+		put(run, "reports/test.1.json", `{"verdict": "fail"}`);
+		put(run, "reports/test.2.json", `{"verdict": "pass"}`);
+		put(run, "reports/review.1.json", `{"verdict": "changes_requested"}`);
+		put(run, "reports/review.1.notes.md", "notes");
+		put(run, "reports/review.diff.1.patch", "diff");
+		put(run, "reports/security.1.json", "not json");
+		writeFileSync(join(repo, "a.txt"), "a2\n");
+		const sha = sh(root, "freeze", run);
+		const want = (tree: string) => [
+			"plan: plan.2",
+			"designs: P2.2 P10.1",
+			"changes: P1.2 P2.1",
+			"test: test.2 pass",
+			"review: review.1 changes_requested",
+			"loops: test 1 · review 1",
+			`freeze: ${sha}`,
+			`tree: ${tree}`,
+		];
+		expect(sh(root, "status", run).split("\n")).toEqual(want("matches freeze"));
+		writeFileSync(join(repo, "a.txt"), "a3\n");
+		expect(sh(root, "status", run).split("\n")).toEqual(want("stale"));
+	});
+
+	test("missing run dir or invalid JSON report exits 2", () => {
+		const { root, run } = initRepo();
+		expect(attempt(root, "status", join(run, "nope")).status).toBe(2);
+		put(run, "reports/review.2.json", "{broken");
+		const r = attempt(root, "status", run);
+		expect(r.status).toBe(2);
+		expect(r.err).toContain("review.2.json is not valid JSON");
 	});
 });

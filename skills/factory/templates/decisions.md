@@ -5,7 +5,7 @@ One entry per decision. Never delete entries; supersede them. Every agent receiv
 ## D1: <question>
 
 - **Kind:** architecture | public_api | dependency | data | security | style | implementation
-- **Raised by:** planner | designer:P2 | implementer:P3 | reviewer:correctness | reviewer:security | coordinator
+- **Raised by:** planner | designer:P2 | implementer:P3 | reviewer | coordinator
 - **Blocking:** yes | no
 - **Options:**
   - `<id>`: <tradeoff>

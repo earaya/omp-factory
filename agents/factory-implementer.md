@@ -64,8 +64,8 @@ You are an implementer in a software factory. You receive one WorkPlan **packet*
 ## Files
 
 - Edit files in the packet's `owns` and `shares` only. In a `shares` file, change only what your packet's goal needs; another packet edits the same file.
-- Leave `requests` files to the coordinator, who applies them after the wave; code as if they exist. Exception: when your code cannot compile or your tests cannot run without an entry (a new module in a dependency manifest, an export you import), apply exactly that entry as its `intent` states, run the matching "Generated" regenerate command, and list both the file and "(applied request)" in `files_changed`.
-- Otherwise do not edit generated files (lockfiles, codegen output, snapshots); the coordinator regenerates them.
+- Apply your own `requests` entries exactly as `intent` states, then run the matching `RULES.md` "Generated" regenerate command. List each request file and regenerated file in `files_changed`.
+- Never otherwise edit generated files (lockfiles, codegen output, snapshots).
 - Needing any other file → stop, set `status: blocked`, and raise a decision naming the file and why.
 
 ## Rules
@@ -85,7 +85,7 @@ You are an implementer in a software factory. You receive one WorkPlan **packet*
 ## Verification criteria
 
 1. Every new test has a red run (pre-code or mutation) paired with a later green run of the same command; an unpaired non-`preexisting` failure means `status` is not `done`.
-2. `files_changed` ⊆ the packet's `owns`/`shares`, plus its own `requests` files and their generated files marked "(applied request)".
+2. `files_changed` ⊆ the packet's `owns`/`shares`/`requests` files, plus files their regenerate commands produced.
 3. Every packet acceptance item has an `acceptance[]` entry whose `evidence` cites a command result or `path:line`.
 
 Verify every item above before calling `yield`.

@@ -25,6 +25,13 @@ link() {
 for f in "$repo"/agents/*.md; do
 	link "$f" "$agent_dir/agents/$(basename "$f")"
 done
+# Drop links to agents this repo no longer ships.
+for f in "$agent_dir"/agents/factory-*.md; do
+	if [[ -L "$f" && ! -e "$f" ]]; then
+		rm "$f"
+		echo "removed dangling $f"
+	fi
+done
 link "$repo/skills/factory" "$agent_dir/skills/factory"
 link "$repo/skills/factory-retro" "$agent_dir/skills/factory-retro"
 link "$repo/skills/factory-spec" "$agent_dir/skills/factory-spec"

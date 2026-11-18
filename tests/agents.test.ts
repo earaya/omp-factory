@@ -33,14 +33,7 @@ describe("agent definitions", () => {
 				const { description: _, ...rest } = fm.output.properties.decisions;
 				return [name, rest] as const;
 			});
-		expect(schemas.length).toBeGreaterThanOrEqual(5);
+		expect(schemas.length).toBeGreaterThanOrEqual(4);
 		for (const [, schema] of schemas) expect(schema).toEqual(schemas[0][1]);
-	});
-
-	test("both reviewers share the ReviewReport schema", () => {
-		const [security, correctness] = [agents["factory-security-reviewer"], agents["factory-reviewer"]].map(fm =>
-			JSON.parse(JSON.stringify(fm.output, (k, v) => (k === "description" ? undefined : v))),
-		);
-		expect(security).toEqual(correctness);
 	});
 });
