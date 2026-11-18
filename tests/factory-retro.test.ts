@@ -1,6 +1,6 @@
 import { describe, expect, test, afterEach } from "bun:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -52,19 +52,17 @@ const runMd = (log: string[], tail = "") =>
 const empty = (name: string) => ({
 	run: name,
 	plan_generations: 0,
-	amendments: 0,
 	schema_failures: { count: 0, lines: [] },
 	advisories: { adopted: 0, rejected: 0, unclassified: 0, lines: [], mentioned: [] },
-	applied_requests: [],
 	deviations: [],
-	loops: { test: null, review: null, security: null },
+	loops: { test: null, review: null },
 	decisions: { user: 0, auto: 0, total: 0 },
 });
 
 describe("factory-retro.ts usage", () => {
 	test("no command or no run dir: usage on stderr, exit 2", () => {
 		const root = mkRoot();
-		for (const args of [[], ["collect"], ["bogus"]]) {
+		for (const args of [[], ["collect"], ["report"], ["bogus"]]) {
 			const r = run(root, ...args);
 			expect(r.status).toBe(2);
 			expect(r.stdout).toBe("");
@@ -73,13 +71,16 @@ describe("factory-retro.ts usage", () => {
 	});
 
 	test("missing run dir: exit 2, stderr names it, nothing on stdout", () => {
-		const root = mkRoot();
-		const good = mkRun(root, "good");
-		const missing = join(root, "no-such-run");
-		const r = run(root, "collect", good, missing);
-		expect(r.status).toBe(2);
-		expect(r.stdout).toBe("");
-		expect(r.stderr).toContain(missing);
+		for (const command of ["collect", "report"]) {
+			const root = mkRoot();
+			const good = mkRun(root, "good");
+			const missing = join(root, "no-such-run");
+			const r = run(root, command, good, missing);
+			expect(r.status).toBe(2);
+			expect(r.stdout).toBe("");
+			expect(r.stderr).toContain(missing);
+			expect(existsSync(join(good, "report.html"))).toBe(false);
+		}
 	});
 });
 
@@ -95,7 +96,7 @@ describe("factory-retro.ts collect", () => {
 		const root = mkRoot();
 		const out = run(root, "collect", mkRun(root, "r")).stdout;
 		expect(Object.keys(JSON.parse(out))).toEqual([
-			"advisories", "amendments", "applied_requests", "decisions", "deviations", "loops", "plan_generations", "run", "schema_failures",
+			"advisories", "decisions", "deviations", "loops", "plan_generations", "run", "schema_failures",
 		]);
 		expect(run(root, "collect", join(root, "r") + "/").stdout).toBe(out); // trailing slash: same run name
 	});
@@ -112,36 +113,14 @@ describe("factory-retro.ts collect", () => {
 		expect(collect(root, r).plan_generations).toBe(10);
 	});
 
-	test("amendments sum every plan.<N>.amendments.json array", () => {
-		const root = mkRoot();
-		const r = mkRun(root, "r", {
-			"plan.1.json": "{}",
-			"plan.1.amendments.json": JSON.stringify([{ a: 1 }, { a: 2 }]),
-			"plan.2.amendments.json": JSON.stringify([{ a: 3 }]),
-		});
-		expect(collect(root, r).amendments).toBe(3);
-	});
-
-	test("amendments: a non-array plan.<N>.amendments.json fails the collect, naming the file", () => {
-		for (const content of [JSON.stringify("hello"), JSON.stringify({ a: 1 })]) {
-			const root = mkRoot();
-			const r = mkRun(root, "r", { "plan.1.amendments.json": content });
-			const res = run(root, "collect", r);
-			expect(res.status).not.toBe(0);
-			expect(res.stdout).toBe("");
-			expect(res.stderr).toContain("plan.1.amendments.json");
-		}
-	});
-
 	test("changes: a non-JSON, non-object, or mistyped ChangeReport fails the collect with exit 2, naming the file", () => {
-		const valid = JSON.stringify({ files_changed: ["a.go"], deviations: [] });
+		const valid = JSON.stringify({ files_changed: ["a.go"], deviations: [], status: "done" });
 		const bad = [
 			"not json",
-			JSON.stringify([{ files_changed: [] }]),
-			JSON.stringify({ files_changed: "go.mod (applied request)", deviations: [] }),
-			JSON.stringify({ files_changed: [], deviations: "used X" }),
-			JSON.stringify({ files_changed: [], deviations: ["ok", 3] }),
-			JSON.stringify({ files_changed: [1], deviations: [] }),
+			JSON.stringify([{ deviations: [] }]),
+			JSON.stringify({ deviations: "used X" }),
+			JSON.stringify({ deviations: ["ok", 3] }),
+			JSON.stringify({ deviations: [], status: 1 }),
 		];
 		for (const content of bad) {
 			const root = mkRoot();
@@ -156,15 +135,13 @@ describe("factory-retro.ts collect", () => {
 		}
 	});
 
-	test("changes: a missing or null files_changed/deviations counts as empty", () => {
+	test("changes: a missing or null deviations counts as empty", () => {
 		const root = mkRoot();
 		const r = mkRun(root, "r", {
-			"reports/P1.change.1.json": JSON.stringify({ files_changed: null }),
+			"reports/P1.change.1.json": JSON.stringify({ deviations: null }),
 			"reports/P2.change.1.json": JSON.stringify({}),
 		});
-		const out = collect(root, r);
-		expect(out.applied_requests).toEqual([]);
-		expect(out.deviations).toEqual([]);
+		expect(collect(root, r).deviations).toEqual([]);
 	});
 
 	test("loops: a non-JSON, non-object, or non-string-verdict phase report fails the collect with exit 2, naming the file", () => {
@@ -266,22 +243,18 @@ describe("factory-retro.ts collect", () => {
 		});
 	});
 
-	test("applied_requests and deviations come from each packet's latest ChangeReport only", () => {
+	test("deviations come from each packet's latest ChangeReport only", () => {
 		const root = mkRoot();
-		const change = (files: string[], deviations: string[]) => JSON.stringify({ files_changed: files, deviations });
+		const change = (deviations: string[]) => JSON.stringify({ files_changed: [], deviations });
 		const r = mkRun(root, "r", {
-			"reports/P1.change.1.json": change(["old.go (applied request)"], ["stale P1 deviation"]),
-			"reports/P1.change.2.json": change(["a.go", "go.mod (applied request)", "go.sum (applied request)"], ["P1 first", "P1 second"]),
-			"reports/P2.change.9.json": change(["stale.go (applied request)"], ["stale P2 deviation"]),
-			"reports/P2.change.10.json": change(["b.go"], ["P2 only"]),
-			"reports/P10.change.1.json": change(["c.go"], []),
+			"reports/P1.change.1.json": change(["stale P1 deviation"]),
+			"reports/P1.change.2.json": change(["P1 first", "P1 second"]),
+			"reports/P2.change.9.json": change(["stale P2 deviation"]),
+			"reports/P2.change.10.json": change(["P2 only"]),
+			"reports/P10.change.1.json": change([]),
 			"reports/P3.change.1.notes.md": "not a report",
 		});
 		const out = collect(root, r);
-		expect(out.applied_requests).toEqual([
-			{ packet: "P1", file: "go.mod" },
-			{ packet: "P1", file: "go.sum" },
-		]);
 		expect(out.deviations).toEqual([
 			{ packet: "P1", text: "P1 first" },
 			{ packet: "P1", text: "P1 second" },
@@ -298,7 +271,7 @@ describe("factory-retro.ts collect", () => {
 		expect(collect(root, r).deviations.map((d: { packet: string }) => d.packet)).toEqual(["P2", "P10"]);
 	});
 
-	test("loops: highest-N report per phase; sidecars ignored; missing phase is null", () => {
+	test("loops: highest-N report per phase; sidecars and security reports ignored", () => {
 		const root = mkRoot();
 		const verdict = (v: string) => JSON.stringify({ verdict: v });
 		const r = mkRun(root, "r", {
@@ -308,11 +281,11 @@ describe("factory-retro.ts collect", () => {
 			"reports/test.11.notes.md": "sidecar",
 			"reports/review.1.json": verdict("changes_requested"),
 			"reports/review.1.notes.md": "sidecar",
+			"reports/security.2.json": "not even json",
 		});
 		expect(collect(root, r).loops).toEqual({
 			test: { generation: 10, verdict: "pass" },
 			review: { generation: 1, verdict: "changes_requested" },
-			security: null,
 		});
 	});
 
@@ -339,12 +312,11 @@ describe("factory-retro.ts collect", () => {
 		const root = mkRoot();
 		const a = mkRun(root, "a", {
 			"plan.2.json": "{}",
-			"plan.1.amendments.json": "[1, 2]",
 			"run.md": runMd([
 				"- 2026-11-16 plan.2: yield failed schema",
 				"- 2026-11-16 advisory (blocker) adopted",
 			]),
-			"reports/P1.change.1.json": JSON.stringify({ files_changed: ["go.mod (applied request)"], deviations: ["d1"] }),
+			"reports/P1.change.1.json": JSON.stringify({ files_changed: ["go.mod"], deviations: ["d1"] }),
 			"reports/test.2.json": JSON.stringify({ verdict: "pass" }),
 			"decisions.md": "## D1: x\n- **Decided by:** user (Gate 1)\n",
 		});
@@ -367,12 +339,10 @@ describe("factory-retro.ts collect", () => {
 		expect(out.runs[2]).toEqual(empty("c"));
 		expect(out.totals).toEqual({
 			plan_generations: 3,
-			amendments: 2,
 			schema_failures: 1,
 			advisories: { adopted: 1, rejected: 1, unclassified: 1, mentioned: 1 },
-			applied_requests: 1,
 			deviations: 3,
-			loops: { test: 3, review: 3, security: 0 },
+			loops: { test: 3, review: 3 },
 			decisions: { user: 2, auto: 1, total: 3 },
 		});
 	});
@@ -389,5 +359,77 @@ describe("factory-retro.ts collect", () => {
 			cwd: root, env: { ...fixtureEnv(root), PI_CODING_AGENT_DIR: agentDir }, encoding: "utf8",
 		});
 		expect(JSON.parse(out)).toEqual(empty("r"));
+	});
+});
+
+describe("factory-retro.ts report", () => {
+	const report = (root: string, ...runs: string[]) => run(root, "report", ...runs);
+
+	test("renders packets DAG, loops, decisions and escaped log; prints the written path", () => {
+		const root = mkRoot();
+		const packet = (id: string, depends_on: string[]) => ({
+			id, title: `title ${id}`, owns: [`${id}.go`], depends_on, needs_design: false, contract: id === "P1", security_sensitive: false,
+		});
+		const r = mkRun(root, "r", {
+			"run.md": [
+				"# Run: r",
+				"",
+				"- **Status:** done",
+				"- **Base:** abc123",
+				"",
+				"## Log",
+				"",
+				"- 2026-11-18 wave 0: <script>alert(1)</script>",
+			].join("\n") + "\n",
+			"plan.1.json": JSON.stringify({ packets: [packet("P1", [])] }),
+			"plan.2.json": JSON.stringify({ packets: [packet("P1", []), packet("P2", []), packet("P3", ["P1", "P2"])] }),
+			"reports/review.1.json": JSON.stringify({ verdict: "changes_requested" }),
+			"reports/review.2.json": JSON.stringify({ verdict: "approve" }),
+			"reports/security.1.json": "ignored",
+			"reports/P1.change.1.json": JSON.stringify({ status: "done", deviations: [] }),
+			"decisions.md": [
+				"# Decision ledger",
+				"## D1: Cutover mechanism",
+				"- **Kind:** architecture",
+				"- **Decision:** mode-flag",
+				"- **Decided by:** user (Gate 1)",
+				"## D2: Retry count",
+				"- **Kind:** implementation",
+				"- **Decision:** three",
+				"- **Decided by:** auto-adopted (implementation kind only)",
+			].join("\n") + "\n",
+		});
+		const res = report(root, r);
+		expect(res.status).toBe(0);
+		const file = join(r, "report.html");
+		expect(res.stdout).toBe(`${file}\n`);
+		const html = readFileSync(file, "utf8");
+		const svg = html.slice(html.indexOf("<svg"), html.indexOf("</svg>"));
+		for (const id of ["P1", "P2", "P3"]) expect(svg).toContain(`>${id}<`);
+		expect((svg.match(/<line /g) ?? []).length).toBe(2);
+		for (const s of ["D1", "D2", "Cutover mechanism", "mode-flag", "auto-adopted", "review.1", "review.2", "changes_requested", "approve", "Status", "abc123"]) {
+			expect(html).toContain(s);
+		}
+		expect(html).not.toContain("security.1");
+		expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+		expect(html).not.toContain("<script");
+		expect(html).not.toMatch(/https?:/);
+	});
+
+	test("no plan: report carries the 'no plan' note", () => {
+		const root = mkRoot();
+		const r = mkRun(root, "empty");
+		const res = report(root, r);
+		expect(res.status).toBe(0);
+		const html = readFileSync(join(r, "report.html"), "utf8");
+		expect(html).toContain("no plan");
+		expect(html).not.toContain("<svg");
+	});
+
+	test("several run dirs: one report per dir, paths in argument order", () => {
+		const root = mkRoot();
+		const a = mkRun(root, "a");
+		const b = mkRun(root, "b");
+		expect(report(root, a, b).stdout).toBe(`${join(a, "report.html")}\n${join(b, "report.html")}\n`);
 	});
 });

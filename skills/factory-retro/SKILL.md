@@ -15,27 +15,25 @@ Inputs: one or more run directories (`.factory/runs/<slug>/`). No directory give
 "${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/skills/factory-retro/scripts/factory-retro.ts" collect <run-dir> [<run-dir>...]
 ```
 
-Exit 2 → report the stderr message and stop. One directory prints the run object; several print `{runs, totals}`.
+Exit 2 → report the stderr message and stop. One directory prints the run object; several print `{runs, totals}`. `report <run-dir>...` writes a static `report.html` per run (packet DAG, loops, decisions, Log) for reading alongside.
 
 Signals, per run:
 
 | Field | Friction it points at |
 |---|---|
 | `plan_generations` > 1 | a re-plan |
-| `amendments` | plan entries superseded after persistence |
 | `schema_failures` | a yield that failed its output schema |
 | `advisories` | advisor interventions: Log lines whose event word is `advisory`, counted `adopted` / `rejected` / `unclassified` in `lines`; `mentioned` holds uncounted Log lines that cite an advisory inside another event |
-| `applied_requests` | an implementer applied a `requests` entry itself |
 | `deviations` | an implementer departed from packet or DesignNote |
-| `loops.<phase>.generation` > 1 | a fix loop in test, review, or security |
+| `loops.<phase>.generation` > 1 | a fix loop in test or review |
 | `decisions` | `user` vs `auto` (auto-adopted) vs `total` |
 
 The collector matches run.md Log prose by pattern. Re-read every echoed `lines` entry and correct its classification before using it; a misclassified line is not evidence. Read every `advisories.mentioned` line too: it may record an advisory verdict the counts miss.
 
 ## 2. Root-cause
 
-1. Read `skill://factory` and every agent the signals implicate (`factory-planner`, `factory-designer`, `factory-implementer`, `factory-tester`, `factory-reviewer`, `factory-security-reviewer`). Read the target repo's `.omp/RULES.md`.
-2. For each nonzero signal, read the run artifacts behind it (`run.md`, `plan.<N>.json`, `plan.<N>.amendments.json`, `reports/*.json`, `decisions.md`) and find why it happened. A count is not a cause.
+1. Read `skill://factory` and every agent the signals implicate (`factory-planner`, `factory-designer`, `factory-implementer`, `factory-tester`, `factory-reviewer`). Read the target repo's `.omp/RULES.md`.
+2. For each nonzero signal, read the run artifacts behind it (`run.md`, `plan.<N>.json`, `reports/*.json`, `decisions.md`) and find why it happened. A count is not a cause.
 3. Cite evidence on both sides: `path:line` in the run directory, and the `skill://factory`, agent, or `.omp/RULES.md` line the proposal would change. No citation on either side → no proposal.
 4. Decide the fix target:
    - `factory`: the playbook or an agent in omp-factory was missing, wrong, or vague.
