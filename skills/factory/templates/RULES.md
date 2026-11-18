@@ -11,7 +11,7 @@
 
 ## Generated
 
-Files no packet edits; the coordinator regenerates them after each wave.
+Files no packet owns or shares. A packet that needs one changed lists its manifest in `requests` and runs the regenerate command.
 
 - `<path or glob>`: `<regenerate command>` (e.g. `go.sum`: `go mod tidy`; `package-lock.json`: `npm install`; `poetry.lock`: `poetry lock`)
 
@@ -22,9 +22,3 @@ Files no packet edits; the coordinator regenerates them after each wave.
 ## Conventions
 
 - <one-line rules that every change must follow>
-
-## Recipes (optional)
-
-Known-good one-liners for recurring verification; add a recipe only after a run has executed it successfully — never spec an untested command.
-
-- <task>: `<cmd>`

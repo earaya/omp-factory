@@ -29,7 +29,7 @@ output:
           shares: { type: array, items: { type: string }, description: "Files this packet edits that another packet also edits. Packets sharing a file never run in the same shared-checkout wave." }
           requests:
             type: array
-            description: "Registry/append-only edits (exports, route tables, dependency lists, changelogs) that the coordinator applies after the wave."
+            description: "Registry/append-only edits (exports, route tables, dependency manifests, changelogs) the packet applies itself, exactly as `intent` states. Same-wave packets requesting one file are serialized."
             items:
               type: object
               additionalProperties: false
@@ -79,7 +79,7 @@ You are the planner in a software factory. You receive an approved **Brief** (go
    - `owns`: only this packet edits it. No file or glob appears in two packets' `owns`.
    - `shares`: two or more packets must change real logic in it. Prefer chaining them with `depends_on` or merging them; use `shares` only when they are otherwise independent.
    - `requests`: the packet only needs an entry added to a registry-style file (barrel exports, route/DI tables, dependency manifests, changelogs, migration lists). State the entry in `intent`.
-   - Never list files the repo regenerates (lockfiles, codegen output, snapshots; see `RULES.md` "Generated"). The coordinator regenerates them.
+   - Never put files the repo regenerates (lockfiles, codegen output, snapshots; see `RULES.md` "Generated") in `owns` or `shares`. A packet whose change needs one regenerated (a new module in a manifest) lists the manifest in `requests`; the regenerate command runs with it.
 4. When several packets depend on shared types, signatures, or schemas, put those in a `contract: true` packet with no dependencies that every consumer `depends_on`. It lands real definitions, not stubs or placeholder bodies. Consumers list the contract files in `reads`, never in `owns`.
 5. Each `goal` must stand alone: an implementer who has never seen the Brief must be able to execute it. Name exact files, symbols, and interfaces.
 6. `acceptance` items are observable: a command that passes, a behavior a test asserts, an output that appears. Never "code is clean".
@@ -96,7 +96,7 @@ Raise a `decisions[]` entry when the Brief does not settle a choice and no prece
 - `public_api`, `dependency`, `data` (schema, migration, persistence), `security`, `style` (naming, formatting, idiom without precedent).
 - `implementation`: anything else that a reasonable engineer would just pick.
 
-`blocking: true` only when packets cannot proceed without the answer; otherwise recommend and keep planning on the recommendation.
+`blocking: true` only when packets cannot proceed without the answer; otherwise recommend and keep planning on the recommendation. With a blocking decision, plan only the recommended option, never packets for both branches; the coordinator asks and re-spawns you if the answer differs.
 
 ## Rules
 

@@ -2,7 +2,7 @@
 #
 # Factory agents resolve their model from your OMP model roles:
 #   planner / designer / implementer / tester -> @default
-#   reviewer / security reviewer              -> @advisor  (a different family on purpose)
+#   reviewer                                  -> @advisor  (a different family on purpose)
 # The optional factory_* roles below specialize one phase; unset roles fall
 # back to the generic ones, so no merge is required for a working install.
 # modelRoles:              # uncomment and fill to specialize one phase
