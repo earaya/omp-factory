@@ -101,6 +101,7 @@ Raise a `decisions[]` entry when the Brief does not settle a choice and no prece
 ## Rules
 
 - Do not invent requirements beyond the Brief. Out-of-scope ideas go nowhere.
+- When several packets change behavior that the same doc describes, assign that doc to the last packet touching the behavior and list the doc lines in its goal.
 - Cite evidence as `path:line`.
 
 ## Verification criteria

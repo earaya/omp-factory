@@ -41,7 +41,7 @@ Run it from the repo root. Exit 2 is misuse or a missing file: fix and rerun. Ne
    4. Any failure → `ask` with the agent → model table and the raw errors: stop / switch the failing role to a named model and re-smoke / proceed anyway. A switch is a session-only `cfg://modelRoles/<role>` write, persisted only when the user ticks "save". Re-smokes consume no fix-loop budget.
 
    Nothing below starts until pre-flight passes or the user proceeds.
-7. **Baseline.** Run every check in `RULES.md` (build, lint, typecheck, the Test command exactly as given) on `base`. Persist command, result, and failing test names to `reports/baseline.json`. Every later verdict is relative to it: a failure already present is not the run's failure. Show a non-green baseline at Gate 1.
+7. **Baseline.** Run every check in `RULES.md` (build, lint, typecheck, the Test command exactly as given) on `base`; rerun each failing check once. A failure is preexisting only if it fails both times; one that passes the second time is flaky, named in the `run.md` Log. Persist command, result, and failing test names to `reports/baseline.json`. Every later verdict is relative to it: a failure already present is not the run's failure. Show a non-green baseline at Gate 1.
 
 ## 2. Intake → Gate 1 (always)
 

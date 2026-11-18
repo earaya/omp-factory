@@ -18,7 +18,7 @@ Templates: `skill://factory-spec/templates/` (`spec.md`, `roadmap.md`); the ledg
 Every question a tool could answer is a failure. Before the first question:
 
 1. Find the current state: the files, modules, and services the change touches. Use `scout` for unfamiliar areas.
-2. Map every consumer of what changes: callers, other services that read or write the same state (grep sibling repos the user names), config, deploy files.
+2. Map every consumer of what changes, including systems the user does not name: callers, config, deploy files, and other services that read or write the same state. Search the organization's other repos for the store's key prefixes, table names, queue or exchange names, and the message shapes you plan to add (`gh search code` or local checkouts). An existing producer of a planned message shape is a contract collision.
 3. For each piece of data involved, classify where its truth lives: **a cache of a source**, **the only copy**, or **written by another system**. Each class needs its own migration or cutover rule; sorting by feature or by item hides this.
 4. Record facts with `path:line`. Anything you cannot verify is `[INFERENCE]`.
 
