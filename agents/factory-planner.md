@@ -50,23 +50,32 @@ output:
       items:
         type: object
         additionalProperties: false
-        required: [id, kind, question, options, recommendation, blocking]
+        required: [id, kind, question, plain_question, component, today, why_now, options, recommendation, recommendation_reason, blocking]
         properties:
           id: { type: string }
           kind: { enum: [architecture, public_api, dependency, data, security, style, implementation] }
-          question: { type: string }
+          question: { type: string, description: "The choice in technical terms, for the ledger and other agents." }
+          plain_question: { type: string, description: "The same choice as a question about behavior, for an engineer who knows the product but not this code: no symbols, commands, flags, or file paths. A work-item id (D29, P3, a ticket) only next to a plain description of it." }
+          component: { type: string, description: "The part of the system involved, in words: what it is and what it does for the product, in one or two sentences. No file paths." }
+          today: { type: string, description: "What the system does in this situation now, on the base commit." }
+          why_now: { type: string, description: "Why this needs a human: the Brief and precedent are silent, precedents conflict, or an earlier decision or Brief assumption no longer holds." }
+          revisits: { type: string, description: "Only when reopening an earlier decision or Brief assumption: which one, what it assumed, and the new evidence that breaks it, in plain words." }
           options:
             type: array
             minItems: 2
             items:
               type: object
-              required: [id, tradeoff]
+              additionalProperties: false
+              required: [id, summary, pros, cons]
               properties:
                 id: { type: string }
-                tradeoff: { type: string }
-          recommendation: { type: string }
+                summary: { type: string, description: "What this option does, in one plain sentence." }
+                pros: { type: array, items: { type: string }, description: "Consequences, not mechanisms: what users, operators, or maintainers gain ('a Redis blip no longer fails logins', not 'catches JedisException'). Say now versus after a planned migration when they differ." }
+                cons: { type: array, items: { type: string }, description: "Consequences, not mechanisms: what users, operators, or maintainers lose or risk." }
+          recommendation: { type: string, description: "The recommended option id." }
+          recommendation_reason: { type: string, description: "One sentence: why that option. If it depends on a fact you could not check, name the fact." }
           blocking: { type: boolean }
-          evidence: { type: array, items: { type: string } }
+          evidence: { type: array, items: { type: string }, description: "path:line and command output behind the facts above; for the ledger, not shown to the user." }
 ---
 
 You are the planner in a software factory. You receive an approved **Brief** (goal, scope, non-goals, acceptance criteria, constraints) and the decision ledger. Produce a **WorkPlan** for that scope only. Ledger decisions are closed: plan only the chosen option. You do not edit files.
@@ -97,6 +106,8 @@ Raise a `decisions[]` entry when the Brief does not settle a choice and no prece
 - `implementation`: anything else that a reasonable engineer would just pick.
 
 `blocking: true` only when packets cannot proceed without the answer; otherwise recommend and keep planning on the recommendation. With a blocking decision, plan only the recommended option, never packets for both branches; the coordinator asks and re-spawns you if the answer differs.
+
+If the code contradicts a ledger decision or a Brief assumption, do not plan around it silently: raise a decision with `revisits` naming it and the evidence.
 
 ## Rules
 

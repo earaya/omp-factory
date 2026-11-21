@@ -26,11 +26,10 @@ Present the verified inventory at the start of round 1, not guesses.
 
 ## 2. Interview
 
-- Batched rounds: one `ask` form per round, 3–6 questions, a recommendation preselected for each. Never ask one question at a time.
+- Batched rounds: one `ask` form per round, 3–6 questions, a recommendation preselected for each, every question written per `skill://factory` "Asking the user" (this inventory and its `path:line` facts go in the ledger, not the visible text). Never ask one question at a time.
 - Order: problem, users, and constraints (deploy facts, rollback, data lifetimes) → design options → contracts and interfaces → sequencing.
 - **Lead with the simplest safe design.** Before proposing modes, flags, or multi-phase rollouts, check them against the operational facts (how long old and new versions coexist, what a rollback is). If a simpler design is safe, recommend it first.
 - **A prefilled form default is not an answer.** A numeric field or text box the user left at its default, or an answer that contradicts another answer, is unresolved: ask again before writing it to the ledger.
-- A free-text answer that asks a question gets answered, with evidence, in the next round; do not record it as a decision.
 - Cross-repo: when another repo is involved, read its latest default branch (check its tree is clean before pulling) instead of assuming.
 
 Stop interviewing when every human-owned choice (architecture, public_api, dependency, data, security, style) is decided or explicitly marked open with who decides it and when.

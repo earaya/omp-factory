@@ -50,7 +50,7 @@ The collector matches run.md Log prose by pattern. Re-read every echoed `lines` 
 One batched `ask` form. Never ask per proposal. Each proposal:
 
 - title: `[factory]` or `[repo]` tag, `add` / `change` / `delete`, one-line summary;
-- body: the signal, the root cause, both citations, the exact text to add, change, or delete, and `single-run evidence` when it applies;
+- body: the signal, the root cause, both citations, the exact text to add, change, or delete, and `single-run evidence` when it applies; explain the friction in plain words per `skill://factory` "Asking the user" (citations and the proposed text are the exception to its no-paths rule);
 - radio group: accept / reject (no preselection);
 - textarea: edits to the proposed text.
 

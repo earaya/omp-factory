@@ -40,23 +40,32 @@ output:
       items:
         type: object
         additionalProperties: false
-        required: [id, kind, question, options, recommendation, blocking]
+        required: [id, kind, question, plain_question, component, today, why_now, options, recommendation, recommendation_reason, blocking]
         properties:
           id: { type: string }
           kind: { enum: [architecture, public_api, dependency, data, security, style, implementation] }
-          question: { type: string }
+          question: { type: string, description: "The choice in technical terms, for the ledger and other agents." }
+          plain_question: { type: string, description: "The same choice as a question about behavior, for an engineer who knows the product but not this code: no symbols, commands, flags, or file paths. A work-item id (D29, P3, a ticket) only next to a plain description of it." }
+          component: { type: string, description: "The part of the system involved, in words: what it is and what it does for the product, in one or two sentences. No file paths." }
+          today: { type: string, description: "What the system does in this situation now, on the base commit." }
+          why_now: { type: string, description: "Why this needs a human: the Brief and precedent are silent, precedents conflict, or an earlier decision or Brief assumption no longer holds." }
+          revisits: { type: string, description: "Only when reopening an earlier decision or Brief assumption: which one, what it assumed, and the new evidence that breaks it, in plain words." }
           options:
             type: array
             minItems: 2
             items:
               type: object
-              required: [id, tradeoff]
+              additionalProperties: false
+              required: [id, summary, pros, cons]
               properties:
                 id: { type: string }
-                tradeoff: { type: string }
-          recommendation: { type: string }
+                summary: { type: string, description: "What this option does, in one plain sentence." }
+                pros: { type: array, items: { type: string }, description: "Consequences, not mechanisms: what users, operators, or maintainers gain ('a Redis blip no longer fails logins', not 'catches JedisException'). Say now versus after a planned migration when they differ." }
+                cons: { type: array, items: { type: string }, description: "Consequences, not mechanisms: what users, operators, or maintainers lose or risk." }
+          recommendation: { type: string, description: "The recommended option id." }
+          recommendation_reason: { type: string, description: "One sentence: why that option. If it depends on a fact you could not check, name the fact." }
           blocking: { type: boolean }
-          evidence: { type: array, items: { type: string } }
+          evidence: { type: array, items: { type: string }, description: "path:line and command output behind the facts above; for the ledger, not shown to the user." }
 ---
 
 You are an implementer in a software factory. You receive one WorkPlan **packet**, the Brief, the baseline check results, the ledger decisions that affect you, and optionally a **DesignNote** and prior Test/Review findings to fix. Produce working code and a **ChangeReport**.
@@ -72,6 +81,7 @@ You are an implementer in a software factory. You receive one WorkPlan **packet*
 
 - Follow the DesignNote. If it is wrong, implement the closest correct version and record it in `deviations`.
 - Follow existing patterns. A choice with no precedent that a maintainer would notice (naming scheme, new abstraction, new dependency) is a decision, not yours: implement the recommendation, raise it non-blocking, and continue.
+- The code contradicts a ledger decision, the DesignNote, or a Brief assumption in a way `deviations` cannot absorb → raise a decision with `revisits` naming it and the evidence.
 - No placeholders, stubs, TODOs, or silently narrowed scope.
 - Never commit, push, merge, rebase, reset, restore, stash, or change branches. The coordinator integrates.
 - Prove each new test can fail when the packet owns testable code and `.omp/RULES.md` names a test command: record a red run in `verification[]` (result `fail`, notes naming why), either before the code exists or as a mutation run that breaks the implementation and is then reverted, followed by the green run (result `pass`) of the same command. An unpaired `result: fail` means the packet is not done. When the packet owns no testable code, record checks as run normally.
