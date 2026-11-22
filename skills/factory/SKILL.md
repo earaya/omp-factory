@@ -32,6 +32,42 @@ write(f"{run}/reports/P1.change.1.json", json.dumps(rs[0], indent=2))
 - A slot holding an error, or a result that is not a schema-valid object → log it and re-spawn that worker once; then escalate.
 - Generation `<N>` counts revisions per artifact from 1; never overwrite one. Annotations go in `<report>.notes.md` sidecars or the Log, never in a report.
 
+## Asking the user
+
+Applies to every `ask` (gates, escalations, pre-flight) and to chat answers about the run. The reader is an engineer who knows the product but has not read this code or this run's artifacts. User-facing text here overrides any instruction to write terse fragments for a technical reader.
+
+You write the final text. A worker's `plain_question`, `component`, `today`, `why_now`, `revisits` and option `pros`/`cons` are raw material: check them against what the user said in this session and rewrite whatever assumes context the user lacks.
+
+Before asking:
+
+- Know the user's direction: the Brief Goal, the spec, and what the user said in this session (for example, "we are moving work out of heimdall into gatekeeper"). It changes which option is better; say how each option fits it.
+- Drop non-questions into a numbered **Small decisions** table: what was chosen and why, one line each, with a textarea for overrides by row number. They are `implementation` decisions; choices the Brief, a ledger decision, precedent, or the user's stated direction settles; choices where one option is a defect (for example, it logs credentials); and choices whose options look the same to users and operators and differ only inside the code this run writes. Blocking and reopened decisions are always questions.
+
+Each question, in this order, aiming for about 120 words plus the table; never cut Today or a con to fit:
+
+1. **Title:** a plain question about behavior ("What happens to one-time login links if Redis fails mid-use?"), not an id or symbol.
+2. **Where:** the component in words: what it is and what it does for the product. No file paths or line numbers.
+3. **Today:** what the system does now in this situation.
+4. **Why you're asked:** what the Brief, spec, or precedent leaves open.
+5. **Options:** a table, one row per option, columns Option / Pros / Cons. Pros and cons are consequences ("a Redis blip becomes a failed login"), not mechanisms ("throws an exception"); give now versus after a planned migration when they differ.
+6. **Recommendation:** one sentence on why.
+7. **Doesn't change:** one line when useful ("users see no difference", "dev3 only").
+
+Radio labels are the plain option summaries; the recommended one ends "(recommended)" and is preselected.
+
+If your recommendation differs from the worker's, say so in one line ("The planner recommended X; I recommend Y because …") and record both in `decisions.md`.
+
+Reopening an earlier decision or a Brief or spec assumption (a worker's `revisits`, or your own finding) is its own question, first in the form, opening with: "At <gate, or in the spec> we chose (or assumed) <X> because <reason>. We found <evidence, in plain words>, so <X> now means <consequence>." Where, Today and the options follow as usual.
+
+Wording: work-item ids (D29, P3, tickets) may follow a plain description, never replace it. No symbols, commands, flags, source file paths, or option ids in visible text; those go in `decisions.md`. Run-dir paths the user may open are fine. An unavoidable technical term gets a short explanation in parentheses the first time it appears.
+
+Form layout: first line, "Preselected answers are my recommendations, not choices you have made; a timeout submits them." Then status in at most five short lines, then reopened decisions, other questions, Small decisions, and last any long material (Brief, plan table, baseline detail) or a run-dir path to it.
+
+Answers:
+
+- A free-text answer that asks a question, or asks why something matters, is not a decision: never record the recommendation as the user's choice. Answer it in the next form, then ask again.
+- Answer any question from the user, in a form or in chat, directly in the first sentence. Then give a concrete scenario (what comes in, what the system does, what the user sees), then detail only if it is needed. Use short sentences and plain words.
+
 ## 0. Triage
 
 - **trivial** (one obvious change, ≤ ~1 file): tell the user it does not need the factory and offer to just do it. Stop unless they insist.
@@ -60,7 +96,7 @@ write(f"{run}/reports/P1.change.1.json", json.dumps(rs[0], indent=2))
 
 Write `brief.md` from `templates/brief.md`. Investigate the code enough to make acceptance criteria observable; use `scout` for unfamiliar areas. A run imported from a `factory-spec` roadmap item takes that spec's `decisions.md` entries as closed.
 
-**Gate 1**: one `ask` form with the Brief (`<pre>`), any drafted `RULES.md`, a non-green baseline, missing git identity, the `P1` packet for small tasks, and approve / approve with edits (textarea) / stop. Classify each open question by decision `kind`; every human-owned one (architecture, public_api, dependency, data, security, style) goes in the same form as a radio group with the recommendation preselected. Write each answer into `brief.md` as a Constraint, remove it from Open questions, and record it in `decisions.md` as decided by the user. `implementation` questions wait for the plan. Do not plan before approval.
+**Gate 1**: one `ask` form per [Asking the user](#asking-the-user): human-owned open questions first, then the Brief (`<pre>`), any drafted `RULES.md`, a non-green baseline, missing git identity, the `P1` packet for small tasks, and approve / approve with edits (textarea) / stop. Classify each open question by decision `kind`; every human-owned one (architecture, public_api, dependency, data, security, style) is a question with the recommendation preselected. Write each answer into `brief.md` as a Constraint, remove it from Open questions, and record it in `decisions.md` as decided by the user. `implementation` questions wait for the plan. Do not plan before approval.
 
 ## 3. Plan
 
@@ -80,10 +116,10 @@ For each `needs_design` packet, spawn `factory-designer` with the packet, the Br
 
 The human owns architecture and taste. Collect planner and designer `decisions[]` into `decisions.md` (`templates/decisions.md`) and route by `kind`:
 
-- `implementation`, non-blocking → adopt the recommendation as `auto-adopted`; list it in the form so the user can override.
-- any other kind, or `blocking: true` → a question, recommendation preselected so a timeout still proceeds.
+- `implementation`, non-blocking → adopt the recommendation as `auto-adopted`; list it in the form's Small decisions table so the user can override.
+- any other kind, or `blocking: true` → a question, recommendation preselected so a timeout still proceeds, unless [Asking the user](#asking-the-user) puts it in Small decisions; then it is `auto-adopted`, with what settled it in its Notes.
 
-Gate 2 fires when any question exists: one `ask` form, each question a radio group with options, tradeoffs, and evidence. With an `architecture` decision or `contract` packets, include the `plan.<N>.md` table. Record who decided. Never re-ask a decided question.
+Gate 2 fires when any question exists: one `ask` form per [Asking the user](#asking-the-user). With an `architecture` decision or `contract` packets, include the `plan.<N>.md` table after the questions. Record who decided. Never re-ask a decided question.
 
 When the run came from a `factory-spec` roadmap, also append every user-decided entry to the spec's `decisions.md` (next free id, citing this run) and list them in `summary.md`, so later runs import them as closed.
 
@@ -129,13 +165,13 @@ Thrash guard, at any loop: a recurrence of an earlier finding, or no progress (t
 
 1. Write `summary.md`: what changed, acceptance status, test results against the baseline, review results, every decision and who made it, unrouted deviations, remaining risks.
 2. Generate the run report: `"${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/skills/factory-retro/scripts/factory-retro.ts" report <run-dir>` writes `<run-dir>/report.html`; give its path in the form.
-3. **Gate 3** `ask`: the summary, `git diff --stat <base>`, untracked files, open `taste` findings and stale-doc deviations (checkboxes: which to apply), pending reviewer decisions (radio groups), and: commit on the Run branch (preselected) / commit and push it / commit, push, and open a PR / leave uncommitted.
+3. **Gate 3** `ask`, per [Asking the user](#asking-the-user): the summary, `git diff --stat <base>`, untracked files, open `taste` findings and stale-doc deviations (checkboxes: which to apply, each a plain sentence on what it changes), pending reviewer decisions (questions), and: commit on the Run branch (preselected) / commit and push it / commit, push, and open a PR / leave uncommitted.
 4. Selected items that change code → one implementer round, rerun the checks, re-freeze; no new review unless the change exceeds what was named.
 5. Do exactly what was chosen. Message: conventional summary line plus body from `summary.md`. Use the existing remote; never force-push, never merge to the default branch.
 
 ## Rules for the coordinator
 
-- Every gate and escalation goes through `ask`, batched.
+- Every gate and escalation goes through `ask`, batched, written per [Asking the user](#asking-the-user).
 - The run dir is the source of truth if the session compacts or resumes: persist every handoff before using it, and update `run.md`'s Status after each phase.
 - `run.md` Log: one event per line, `- <date> <event>: <text>`.
 - An **advisory** is an `<advisory>` note from the omp advisor (see README). Treat each as a finding: verify it against the tree, then log it on its own line whose event word is `advisory`, with `adopted` or `rejected` and the reason. During test/review, batch adopted fixes into one wave and re-freeze once, not per advisory.
